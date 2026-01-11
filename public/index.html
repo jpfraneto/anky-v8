@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>anky</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --bg: #050506;
+        --fg: #fafafa;
+        --muted: #71717a;
+        --gold: #fbbf24;
+        --danger: #f87171;
+        --purple: #a855f7;
+        --yellow: #eab308;
+      }
+      body {
+        font-family: "Inter", -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Feed background */
+      .feed {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+        opacity: 0.12;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+      }
+      .feed.hidden {
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+      .feed-item {
+        aspect-ratio: 1;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        opacity: 0;
+        animation: fadeIn 1s ease-out forwards;
+      }
+      .feed-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* Wallet button */
+      .wallet-btn {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 50;
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 2rem;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .wallet-btn:hover {
+        color: var(--fg);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .wallet-btn.connected {
+        color: var(--gold);
+        border-color: rgba(251, 191, 36, 0.3);
+      }
+
+      /* Main */
+      .main {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      /* Hero */
+      .hero {
+        text-align: center;
+        margin-bottom: 3rem;
+        transition: opacity 0.4s, transform 0.4s;
+      }
+      .hero.hidden {
+        opacity: 0;
+        transform: translateY(-20px);
+        pointer-events: none;
+        position: absolute;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 8vw, 4rem);
+        font-weight: 300;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 0.5rem;
+      }
+      .hero p {
+        font-size: clamp(1rem, 3vw, 1.5rem);
+        font-weight: 300;
+        color: var(--muted);
+      }
+
+      /* Writing */
+      .writing-container {
+        width: 100%;
+        max-width: 48rem;
+        transition: all 0.4s;
+      }
+      .writing-container.fullscreen {
+        position: fixed;
+        inset: 0;
+        max-width: none;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+        background: var(--bg);
+      }
+      .writing-area {
+        width: 100%;
+        min-height: 120px;
+        padding: 1.5rem;
+        font-family: "Inter", sans-serif;
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1rem;
+        resize: none;
+        outline: none;
+        caret-color: var(--gold);
+      }
+      .writing-area::placeholder {
+        color: var(--muted);
+      }
+      .writing-area:focus {
+        border-color: rgba(251, 191, 36, 0.3);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .writing-container.fullscreen .writing-area {
+        flex: 1;
+        min-height: 0;
+        font-size: 1.2rem;
+      }
+
+      /* Timer */
+      .timer-container {
+        margin-top: 1rem;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .timer-container.visible {
+        opacity: 1;
+      }
+      .timer-bar-wrapper {
+        width: 100%;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .timer-bar {
+        height: 100%;
+        background: var(--gold);
+        border-radius: 2px;
+        transition: width 0.1s linear;
+        width: 100%;
+      }
+      .timer-bar.danger {
+        background: var(--danger);
+      }
+      #timerText {
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Stats */
+      .stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.75rem;
+        font-size: 0.75rem;
+        color: var(--muted);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .stats.visible {
+        opacity: 1;
+      }
+      
+      /* Left stats - words, WPM, timer */
+      .stats-left {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      
+      /* Right stats - key counters */
+      .stats-right {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat-item.red {
+        color: var(--danger);
+      }
+      .stat-item.purple {
+        color: var(--purple);
+      }
+      .stat-item.yellow {
+        color: var(--yellow);
+      }
+      .anky-status {
+        color: var(--gold);
+        font-weight: 500;
+        display: none;
+      }
+      .anky-status.visible {
+        display: inline;
+      }
+
+      /* Floating key effects */
+      .key-effect {
+        position: absolute;
+        pointer-events: none;
+        font-size: 1rem;
+        font-weight: bold;
+        z-index: 30;
+        animation: keyFloat 2s ease-out forwards;
+      }
+      
+      .key-effect.backspace {
+        color: var(--danger);
+        text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+      }
+      
+      .key-effect.enter {
+        color: var(--purple);
+        text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+      }
+      
+      .key-effect.arrow {
+        color: var(--yellow);
+        text-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+      }
+      
+      @keyframes keyFloat {
+        0% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: translateY(-20px) scale(1.2);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-40px) scale(0.8);
+        }
+      }
+      
+      /* Text markers for key positions */
+      .text-marker {
+        display: inline;
+        position: relative;
+      }
+      
+      .text-marker.backspace::after {
+        content: '⌫';
+        position: absolute;
+        top: -0.5em;
+        right: -0.3em;
+        font-size: 0.6em;
+        color: var(--danger);
+        opacity: 0.3;
+        pointer-events: none;
+      }
+      
+      .text-marker.enter::after {
+        content: '↵';
+        position: absolute;
+        top: -0.5em;
+        right: -0.3em;
+        font-size: 0.6em;
+        color: var(--purple);
+        opacity: 0.3;
+        pointer-events: none;
+      }
+      
+      .text-marker.arrow::after {
+        content: '→';
+        position: absolute;
+        top: -0.5em;
+        right: -0.3em;
+        font-size: 0.6em;
+        color: var(--yellow);
+        opacity: 0.3;
+        pointer-events: none;
+      }
+
+      /* Result overlay */
+      #result {
+        position: fixed;
+        inset: 0;
+        background: rgba(5, 5, 6, 0.98);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 2rem;
+        overflow-y: auto;
+      }
+      #result.visible {
+        display: flex;
+      }
+      .result-content {
+        max-width: 600px;
+        width: 100%;
+        text-align: center;
+      }
+      .result-image {
+        width: 100%;
+        max-width: 400px;
+        aspect-ratio: 1;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+      }
+      .result-title {
+        font-size: 1.5rem;
+        font-weight: 300;
+        margin-bottom: 1.5rem;
+        color: var(--gold);
+      }
+      .result-reflection {
+        font-size: 1rem;
+        line-height: 1.8;
+        color: rgba(250, 250, 250, 0.8);
+        margin-bottom: 2rem;
+        text-align: left;
+      }
+      .result-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      /* Buttons */
+      .btn {
+        padding: 0.75rem 2rem;
+        font-size: 0.9rem;
+        font-weight: 500;
+        border: none;
+        border-radius: 2rem;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .btn-primary {
+        background: var(--gold);
+        color: var(--bg);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(251, 191, 36, 0.3);
+      }
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--fg);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* Loading */
+      .loading {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+      }
+      .loading.visible {
+        display: flex;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 2px solid rgba(251, 191, 36, 0.2);
+        border-top-color: var(--gold);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .loading-text {
+        color: var(--muted);
+      }
+
+      /* Generation overlay */
+      .generation-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(5, 5, 6, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 1rem;
+        text-align: center;
+        z-index: 200;
+        border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+        display: none;
+      }
+      .generation-overlay.visible {
+        display: block;
+      }
+      .generation-overlay-text {
+        color: var(--gold);
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+
+      /* Session reading view */
+      .session-reading {
+        max-width: 48rem;
+        width: 100%;
+        margin: 0 auto;
+        padding: 2rem;
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+      }
+      .session-reading-content {
+        font-size: 1rem;
+        line-height: 1.8;
+        color: rgba(250, 250, 250, 0.9);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Feed background (loaded via HTMX) -->
+    <div
+      class="feed"
+      id="feed"
+      hx-get="/api/feed-html"
+      hx-trigger="load"
+      hx-swap="innerHTML"
+    ></div>
+
+    <!-- Wallet Button -->
+    <button class="wallet-btn" id="walletBtn" onclick="connectWallet()">
+      connect wallet
+    </button>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="hero" id="hero">
+        <h1>YOUR MIND IS LOUD</h1>
+        <p>let it speak <em>(for 8 minutes, without thinking)</em></p>
+      </div>
+
+      <div class="writing-container" id="writingContainer">
+        <textarea
+          class="writing-area"
+          id="writingArea"
+          placeholder="tell us who you are"
+          autofocus
+        ></textarea>
+
+        <div class="timer-container" id="timerContainer">
+          <div class="timer-bar-wrapper">
+            <div class="timer-bar" id="timerBar"></div>
+          </div>
+        </div>
+
+        <div class="stats" id="stats">
+          <div class="stats-left">
+            <span id="wordCount">0 words</span>
+            <span id="wpm">0 WPM</span>
+            <span id="duration">0:00</span>
+            <span id="ankyStatus" class="anky-status">✦ becoming anky</span>
+          </div>
+          <div class="stats-right">
+            <span id="backspaceCount" class="stat-item red">⌫ 0</span>
+            <span id="enterCount" class="stat-item purple">↵ 0</span>
+            <span id="arrowCount" class="stat-item yellow">←→ 0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generation overlay -->
+    <div class="generation-overlay" id="generationOverlay">
+      <p class="generation-overlay-text">✦ creating your anky...</p>
+    </div>
+
+    <!-- Result overlay -->
+    <div id="result">
+      <div class="result-content">
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <p class="loading-text">creating your anky...</p>
+          <div
+            class="session-reading"
+            id="sessionReading"
+            style="display: none"
+          >
+            <div
+              class="session-reading-content"
+              id="sessionReadingContent"
+            ></div>
+          </div>
+        </div>
+        <div id="resultDisplay" style="display: none">
+          <img class="result-image" id="resultImage" src="" alt="Your Anky" />
+          <h2 class="result-title" id="resultTitle"></h2>
+          <p class="result-reflection" id="resultReflection"></p>
+          <div class="result-actions">
+            <button class="btn btn-secondary" onclick="writeAgain()">
+              write again
+            </button>
+            <button class="btn btn-primary" id="mintBtn" onclick="mintAnky()">
+              mint anky
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      // ============================================
+      // WALLET CONNECTION (using viem via CDN)
+      // ============================================
+      import {
+        createWalletClient,
+        createPublicClient,
+        custom,
+        http,
+      } from "https://esm.sh/viem@2.21.0";
+      import { base } from "https://esm.sh/viem@2.21.0/chains";
+
+      let walletAddress = null;
+      let walletClient = null;
+      let publicClient = null;
+      let currentAnkyData = null;
+
+      const ANKY_CONTRACT = "0xdf4f77b20cdba13f5235e89bcf06f46618979c55";
+      const ANKY_ABI = [
+        {
+          type: "function",
+          name: "mint",
+          inputs: [
+            { name: "writer", type: "address" },
+            { name: "to", type: "address" },
+            { name: "writingSessionIpfs", type: "string" },
+            { name: "imageIpfs", type: "string" },
+            { name: "imagePrompt", type: "string" },
+            { name: "title", type: "string" },
+            { name: "tokenUri", type: "string" },
+          ],
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "nonpayable",
+        },
+      ];
+
+      // Initialize public client
+      publicClient = createPublicClient({
+        chain: base,
+        transport: http(),
+      });
+
+      window.connectWallet = async function () {
+        if (!window.ethereum) {
+          alert("Please install MetaMask or another wallet");
+          return;
+        }
+
+        try {
+          const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts",
+          });
+
+          walletAddress = accounts[0];
+
+          walletClient = createWalletClient({
+            chain: base,
+            transport: custom(window.ethereum),
+            account: walletAddress,
+          });
+
+          // Update UI
+          const btn = document.getElementById("walletBtn");
+          btn.textContent = `${walletAddress.slice(
+            0,
+            6
+          )}...${walletAddress.slice(-4)}`;
+          btn.classList.add("connected");
+
+          // Switch to Base if needed
+          try {
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0x2105" }], // Base chainId
+            });
+          } catch (switchError) {
+            // Chain not added, add it
+            if (switchError.code === 4902) {
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [
+                  {
+                    chainId: "0x2105",
+                    chainName: "Base",
+                    nativeCurrency: {
+                      name: "ETH",
+                      symbol: "ETH",
+                      decimals: 18,
+                    },
+                    rpcUrls: ["https://mainnet.base.org"],
+                    blockExplorerUrls: ["https://basescan.org"],
+                  },
+                ],
+              });
+            }
+          }
+
+          console.log("Connected:", walletAddress);
+        } catch (e) {
+          console.error("Wallet connection failed:", e);
+          alert("Failed to connect wallet");
+        }
+      };
+
+      window.mintAnky = async function () {
+        if (!walletAddress) {
+          await window.connectWallet();
+          if (!walletAddress) return;
+        }
+
+        if (!currentAnkyData) {
+          alert("No anky data to mint");
+          return;
+        }
+
+        const { writingSessionIpfs, imageIpfs, imagePrompt, title, tokenUri } =
+          currentAnkyData;
+
+        if (!writingSessionIpfs || !imageIpfs || !tokenUri) {
+          alert("IPFS upload required. Please try generating again.");
+          return;
+        }
+
+        const mintBtn = document.getElementById("mintBtn");
+        mintBtn.disabled = true;
+        mintBtn.textContent = "minting...";
+
+        try {
+          const { request } = await publicClient.simulateContract({
+            address: ANKY_CONTRACT,
+            abi: ANKY_ABI,
+            functionName: "mint",
+            args: [
+              walletAddress,
+              walletAddress,
+              writingSessionIpfs,
+              imageIpfs,
+              imagePrompt,
+              title,
+              tokenUri,
+            ],
+            account: walletAddress,
+          });
+
+          const hash = await walletClient.writeContract(request);
+          console.log("Mint tx:", hash);
+
+          mintBtn.textContent = "confirming...";
+
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash,
+          });
+          console.log("Minted!", receipt);
+
+          mintBtn.textContent = "minted! ✦";
+          alert("Your Anky has been minted! 🎉");
+        } catch (e) {
+          console.error("Mint failed:", e);
+          mintBtn.disabled = false;
+          mintBtn.textContent = "mint anky";
+          alert("Minting failed: " + (e.shortMessage || e.message));
+        }
+      };
+
+      // Auto-connect if already connected
+      if (window.ethereum?.selectedAddress) {
+        window.connectWallet();
+      }
+
+      // Listen for account changes
+      window.ethereum?.on("accountsChanged", (accounts) => {
+        if (accounts.length === 0) {
+          walletAddress = null;
+          walletClient = null;
+          document.getElementById("walletBtn").textContent = "connect wallet";
+          document.getElementById("walletBtn").classList.remove("connected");
+        } else {
+          window.connectWallet();
+        }
+      });
+
+      // ============================================
+      // WRITING SESSION
+      // ============================================
+      const INACTIVITY_TIMEOUT = 8000;
+      const ANKY_THRESHOLD = 480;
+
+      let isWriting = false;
+      let sessionStartTime = null;
+      let inactivityTimeout = null;
+      let timerInterval = null;
+      let durationInterval = null;
+      let lastKeyTime = null;
+      let backspaceCount = 0;
+      let enterCount = 0;
+      let arrowCount = 0;
+      let totalWordsTyped = 0;
+
+      const writingArea = document.getElementById("writingArea");
+      const writingContainer = document.getElementById("writingContainer");
+      const hero = document.getElementById("hero");
+      const feed = document.getElementById("feed");
+      const timerContainer = document.getElementById("timerContainer");
+      const timerBar = document.getElementById("timerBar");
+      const stats = document.getElementById("stats");
+      const result = document.getElementById("result");
+      const loading = document.getElementById("loading");
+      const resultDisplay = document.getElementById("resultDisplay");
+      const generationOverlay = document.getElementById("generationOverlay");
+      const sessionReading = document.getElementById("sessionReading");
+      const sessionReadingContent = document.getElementById(
+        "sessionReadingContent"
+      );
+
+      writingArea.addEventListener("input", handleInput);
+      writingArea.addEventListener("keydown", handleKeydown);
+      writingArea.addEventListener("paste", (e) => e.preventDefault());
+      writingArea.addEventListener("select", keepCursorAtEnd);
+      writingArea.addEventListener("mouseup", keepCursorAtEnd);
+
+      // Listen for ESC key globally
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && isWriting) {
+          e.preventDefault();
+          endSession();
+        }
+      });
+
+      function keepCursorAtEnd() {
+        setTimeout(() => {
+          const len = writingArea.value.length;
+          writingArea.setSelectionRange(len, len);
+        }, 0);
+      }
+
+      function handleInput() {
+        keepCursorAtEnd();
+        if (!isWriting && writingArea.value.length > 0) startSession();
+        if (isWriting) {
+          resetInactivityTimer();
+          updateWordCount();
+        }
+      }
+
+      function handleKeydown(e) {
+        if (e.ctrlKey || e.metaKey) {
+          if (["a", "x", "c", "v", "z", "y"].includes(e.key.toLowerCase())) {
+            e.preventDefault();
+          }
+        }
+
+        // Track key presses
+        if (e.key === "Backspace" || e.key === "Delete") {
+          e.preventDefault();
+          if (isWriting) {
+            backspaceCount++;
+            updateRightStats();
+            createFloatingEffect('⌫', 'backspace');
+            createTextMarker('backspace');
+          }
+        }
+
+        if (e.key === "Enter") {
+          e.preventDefault(); // Prevent new lines - stream of consciousness
+          if (isWriting) {
+            enterCount++;
+            updateRightStats();
+            createFloatingEffect('↵', 'enter');
+            createTextMarker('enter');
+          }
+        }
+
+        if (
+          ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
+        ) {
+          if (isWriting) {
+            arrowCount++;
+            updateRightStats();
+            createFloatingEffect('→', 'arrow');
+            createTextMarker('arrow');
+          }
+          e.preventDefault();
+          keepCursorAtEnd();
+        }
+
+        if (["Home"].includes(e.key)) {
+          e.preventDefault();
+          keepCursorAtEnd();
+        }
+      }
+
+      function startSession() {
+        isWriting = true;
+        sessionStartTime = Date.now();
+        lastKeyTime = Date.now();
+        backspaceCount = 0;
+        enterCount = 0;
+        arrowCount = 0;
+        totalWordsTyped = 0;
+
+        hero.classList.add("hidden");
+        feed.classList.add("hidden");
+        writingContainer.classList.add("fullscreen");
+        timerContainer.classList.add("visible");
+        stats.classList.add("visible");
+
+        // Reset counters
+        updateRightStats();
+        document.getElementById("wpm").textContent = "0 WPM";
+
+        resetInactivityTimer();
+        startDurationCounter();
+      }
+
+      function saveSessionToLocalStorage(content, duration, stats) {
+        const session = {
+          content,
+          duration,
+          stats,
+          timestamp: Date.now(),
+          date: new Date().toISOString(),
+        };
+
+        const sessions = JSON.parse(
+          localStorage.getItem("ankySessions") || "[]"
+        );
+        sessions.push(session);
+        localStorage.setItem("ankySessions", JSON.stringify(sessions));
+      }
+
+      async function endSession() {
+        if (!isWriting) return;
+
+        const content = writingArea.value;
+        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+        clearTimeout(inactivityTimeout);
+        clearInterval(timerInterval);
+        clearInterval(durationInterval);
+        isWriting = false;
+
+        // Save session to local storage
+        const sessionStats = {
+          wordCount: content.trim().split(/\s+/).filter(Boolean).length,
+          duration: elapsed,
+          backspaceCount,
+          enterCount,
+          arrowCount,
+        };
+        saveSessionToLocalStorage(content, elapsed, sessionStats);
+
+        // Only generate anky if user wrote for more than 480 seconds
+        if (content.trim().length >= 100 && elapsed >= ANKY_THRESHOLD) {
+          // Show generation overlay
+          generationOverlay.classList.add("visible");
+
+          // Show loading with session content
+          result.classList.add("visible");
+          loading.classList.add("visible");
+          resultDisplay.style.display = "none";
+          sessionReading.style.display = "block";
+          sessionReadingContent.textContent = content;
+
+          try {
+            // Generate via API
+            const response = await fetch("/api/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                writingSession: content.trim(),
+                locale: navigator.language,
+                walletAddress: walletAddress,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+              throw new Error(data.error);
+            }
+
+            // Store for minting
+            currentAnkyData = data;
+
+            // Hide generation overlay
+            generationOverlay.classList.remove("visible");
+
+            // Display result
+            document.getElementById("resultImage").src = data.imageUrl;
+            document.getElementById("resultTitle").textContent = data.title;
+            document.getElementById("resultReflection").textContent =
+              data.reflection;
+
+            loading.classList.remove("visible");
+            sessionReading.style.display = "none";
+            resultDisplay.style.display = "block";
+
+            // Reset mint button
+            const mintBtn = document.getElementById("mintBtn");
+            mintBtn.disabled = false;
+            mintBtn.textContent = "mint anky";
+          } catch (e) {
+            console.error("Generation failed:", e);
+            generationOverlay.classList.remove("visible");
+            loading.innerHTML = `<p style="color: var(--danger);">Generation failed: ${e.message}</p>
+            <button class="btn btn-secondary" onclick="writeAgain()" style="margin-top: 1rem;">try again</button>`;
+            sessionReading.style.display = "none";
+          }
+        } else {
+          // Session ended but didn't meet requirements
+          if (elapsed < ANKY_THRESHOLD) {
+            alert(
+              `Session saved! You wrote for ${formatDuration(
+                elapsed
+              )}. You need to write for at least ${formatDuration(
+                ANKY_THRESHOLD
+              )} to generate an Anky.`
+            );
+          }
+          writeAgain();
+        }
+      }
+
+      window.writeAgain = function () {
+        result.classList.remove("visible");
+        generationOverlay.classList.remove("visible");
+        hero.classList.remove("hidden");
+        feed.classList.remove("hidden");
+        writingContainer.classList.remove("fullscreen");
+        timerContainer.classList.remove("visible");
+        stats.classList.remove("visible");
+
+        writingArea.value = "";
+        timerBar.style.width = "100%";
+        timerBar.classList.remove("danger");
+        document.getElementById("wordCount").textContent = "0 words";
+        document.getElementById("wpm").textContent = "0 WPM";
+        document.getElementById("timerText").textContent = "8.0s";
+        document.getElementById("duration").textContent = "0:00";
+        document.getElementById("ankyStatus").classList.remove("visible");
+        updateRightStats();
+
+        // Reset loading state
+        loading.classList.remove("visible");
+        sessionReading.style.display = "none";
+        loading.innerHTML = `<div class="spinner"></div><p class="loading-text">creating your anky...</p>`;
+        resultDisplay.style.display = "none";
+
+        currentAnkyData = null;
+        backspaceCount = 0;
+        enterCount = 0;
+        arrowCount = 0;
+        totalWordsTyped = 0;
+
+        setTimeout(() => writingArea.focus(), 100);
+      };
+
+      function resetInactivityTimer() {
+        lastKeyTime = Date.now();
+        clearTimeout(inactivityTimeout);
+        clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+          const elapsed = Date.now() - lastKeyTime;
+          const remaining = Math.max(0, INACTIVITY_TIMEOUT - elapsed);
+          const progress = remaining / INACTIVITY_TIMEOUT;
+
+          timerBar.style.width = `${progress * 100}%`;
+          document.getElementById("timerText").textContent = `${(
+            remaining / 1000
+          ).toFixed(1)}s`;
+          timerBar.classList.toggle("danger", progress < 0.25);
+        }, 100);
+
+        inactivityTimeout = setTimeout(endSession, INACTIVITY_TIMEOUT);
+      }
+
+      function startDurationCounter() {
+        durationInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+          document.getElementById("duration").textContent =
+            formatDuration(elapsed);
+          if (elapsed >= ANKY_THRESHOLD) {
+            document.getElementById("ankyStatus").classList.add("visible");
+          }
+        }, 1000);
+      }
+
+      function updateWordCount() {
+        const words = writingArea.value
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean).length;
+        document.getElementById("wordCount").textContent = `${words} word${
+          words !== 1 ? "s" : ""
+        }`;
+        
+        // Calculate WPM
+        if (isWriting && sessionStartTime) {
+          const elapsedMinutes = (Date.now() - sessionStartTime) / 60000;
+          const wpm = elapsedMinutes > 0 ? Math.round(words / elapsedMinutes) : 0;
+          document.getElementById("wpm").textContent = `${wpm} WPM`;
+        }
+      }
+
+      function formatDuration(s) {
+        return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+      }
+
+      function createFloatingEffect(symbol, type) {
+        const effect = document.createElement('div');
+        effect.className = `key-effect ${type}`;
+        effect.textContent = symbol;
+        
+        // Position near the cursor/writing area
+        const rect = writingArea.getBoundingClientRect();
+        const x = rect.left + Math.random() * rect.width;
+        const y = rect.top + rect.height / 2 + Math.random() * 100 - 50;
+        
+        effect.style.left = x + 'px';
+        effect.style.top = y + 'px';
+        
+        document.body.appendChild(effect);
+        
+        // Remove after animation
+        setTimeout(() => {
+          effect.remove();
+        }, 2000);
+      }
+
+      function createTextMarker(type) {
+        // Add a subtle marker at the current cursor position in the text
+        const cursorPos = writingArea.selectionStart;
+        const textBefore = writingArea.value.substring(0, cursorPos);
+        const textAfter = writingArea.value.substring(cursorPos);
+        
+        // Create a temporary span to mark the position
+        const marker = document.createElement('span');
+        marker.className = `text-marker ${type}`;
+        marker.style.position = 'absolute';
+        marker.style.pointerEvents = 'none';
+        marker.style.opacity = '0.3';
+        marker.style.zIndex = '25';
+        
+        // Position it over the writing area
+        const rect = writingArea.getBoundingClientRect();
+        marker.style.left = (rect.left + Math.random() * rect.width) + 'px';
+        marker.style.top = (rect.top + Math.random() * rect.height) + 'px';
+        
+        document.body.appendChild(marker);
+        
+        // Fade out and remove
+        setTimeout(() => {
+          marker.style.transition = 'opacity 1s';
+          marker.style.opacity = '0';
+          setTimeout(() => marker.remove(), 1000);
+        }, 500);
+      }
+
+      function updateRightStats() {
+        const backspaceEl = document.getElementById("backspaceCount");
+        const enterEl = document.getElementById("enterCount");
+        const arrowEl = document.getElementById("arrowCount");
+        
+        // Update text and show/hide based on count
+        backspaceEl.textContent = `⌫ ${backspaceCount}`;
+        backspaceEl.style.display = backspaceCount > 0 ? 'flex' : 'none';
+        
+        enterEl.textContent = `↵ ${enterCount}`;
+        enterEl.style.display = enterCount > 0 ? 'flex' : 'none';
+        
+        arrowEl.textContent = `←→ ${arrowCount}`;
+        arrowEl.style.display = arrowCount > 0 ? 'flex' : 'none';
+      }
+
+      // Focus on load
+      writingArea.focus();
+    </script>
+  </body>
+</html>

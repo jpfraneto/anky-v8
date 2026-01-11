@@ -1,0 +1,23 @@
+{
+  "name": "anky-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "start": "bun run src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^1.34.0",
+    "hono": "^4.5.0",
+    "viem": "^2.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.14"
+  }
+}
