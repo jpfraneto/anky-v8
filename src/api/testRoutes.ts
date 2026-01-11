@@ -21,7 +21,11 @@ export function addTestRoutes(app: Hono): void {
   app.post("/test/prompt", async (c) => {
     console.log("[TEST ROUTE] /api/test/prompt - Request received");
     const { writingSession } = await c.req.json();
-    console.log(`[TEST ROUTE] Writing session length: ${writingSession?.length || 0} chars`);
+    console.log(
+      `[TEST ROUTE] Writing session length: ${
+        writingSession?.length || 0
+      } chars`
+    );
 
     const systemPrompt = `CONTEXT: You are generating an image prompt for Anky based on a user's 8-minute stream of consciousness writing session. Anky is a blue-skinned creature with purple swirling hair, golden/amber eyes, golden decorative accents and jewelry, large expressive ears, and an ancient-yet-childlike quality. Anky exists in mystical, richly colored environments (deep blues, purples, oranges, golds). The aesthetic is spiritual but not sterile — warm, alive, slightly psychedelic.
 
@@ -44,7 +48,7 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
 
     console.log("[TEST ROUTE] Calling Claude API for image prompt...");
     const startTime = Date.now();
-    
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -61,7 +65,9 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`);
+    console.log(
+      `[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`
+    );
 
     const data = (await response.json()) as {
       content: Array<{ text: string }>;
@@ -71,10 +77,14 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
       console.error("[TEST ROUTE] ❌ No content in Claude response");
       throw new Error("Invalid response from Claude API");
     }
-    
+
     const promptText = firstContent.text;
-    console.log(`[TEST ROUTE] ✓ Generated prompt (${promptText.length} chars): "${promptText.substring(0, 100)}..."`);
-    
+    console.log(
+      `[TEST ROUTE] ✓ Generated prompt (${
+        promptText.length
+      } chars): "${promptText.substring(0, 100)}..."`
+    );
+
     return c.json({ prompt: promptText });
   });
 
@@ -82,7 +92,11 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
   app.post("/test/reflection", async (c) => {
     console.log("[TEST ROUTE] /api/test/reflection - Request received");
     const { writingSession, locale = "en" } = await c.req.json();
-    console.log(`[TEST ROUTE] Writing session length: ${writingSession?.length || 0} chars, locale: ${locale}`);
+    console.log(
+      `[TEST ROUTE] Writing session length: ${
+        writingSession?.length || 0
+      } chars, locale: ${locale}`
+    );
 
     const systemPrompt = `CONTEXT: You are Anky — a mirror that reflects the user's unconscious patterns back to them. You have just received an 8-minute stream of consciousness writing session. Your job is not to comfort, validate, or encourage. Your job is to SEE — to name what the user cannot name, to point at the pattern they are running, to speak the thing underneath the thing.
 
@@ -122,7 +136,7 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
 
     console.log("[TEST ROUTE] Calling Claude API for reflection...");
     const startTime = Date.now();
-    
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -139,7 +153,9 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`);
+    console.log(
+      `[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`
+    );
 
     const data = (await response.json()) as {
       content: Array<{ text: string }>;
@@ -149,10 +165,14 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
       console.error("[TEST ROUTE] ❌ No content in Claude response");
       throw new Error("Invalid response from Claude API");
     }
-    
+
     const reflectionText = firstContent.text;
-    console.log(`[TEST ROUTE] ✓ Generated reflection (${reflectionText.length} chars): "${reflectionText.substring(0, 100)}..."`);
-    
+    console.log(
+      `[TEST ROUTE] ✓ Generated reflection (${
+        reflectionText.length
+      } chars): "${reflectionText.substring(0, 100)}..."`
+    );
+
     return c.json({ reflection: reflectionText });
   });
 
@@ -161,15 +181,19 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
     console.log("[TEST ROUTE] /api/test/image - Request received");
     const { prompt } = await c.req.json();
     console.log(`[TEST ROUTE] Prompt length: ${prompt?.length || 0} chars`);
-    console.log(`[TEST ROUTE] Prompt preview: "${prompt?.substring(0, 100)}..."`);
+    console.log(
+      `[TEST ROUTE] Prompt preview: "${prompt?.substring(0, 100)}..."`
+    );
 
     const startTime = Date.now();
     const result = await generateImageWithReferences(prompt);
     const generationTime = Date.now() - startTime;
-    
+
     console.log(`[TEST ROUTE] ✓ Image generated in ${generationTime}ms`);
-    console.log(`[TEST ROUTE] Image base64 length: ${result.base64.length} chars`);
-    
+    console.log(
+      `[TEST ROUTE] Image base64 length: ${result.base64.length} chars`
+    );
+
     return c.json(result);
   });
 
@@ -177,7 +201,9 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
   app.post("/test/title", async (c) => {
     console.log("[TEST ROUTE] /api/test/title - Request received");
     const { writingSession, imagePrompt, reflection } = await c.req.json();
-    console.log(`[TEST ROUTE] Writing session: ${writingSession?.length || 0} chars`);
+    console.log(
+      `[TEST ROUTE] Writing session: ${writingSession?.length || 0} chars`
+    );
     console.log(`[TEST ROUTE] Image prompt: ${imagePrompt?.length || 0} chars`);
     console.log(`[TEST ROUTE] Reflection: ${reflection?.length || 0} chars`);
 
@@ -204,7 +230,7 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
 
     console.log("[TEST ROUTE] Calling Claude API for title...");
     const startTime = Date.now();
-    
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -226,7 +252,9 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`);
+    console.log(
+      `[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`
+    );
 
     const data = (await response.json()) as {
       content: Array<{ text: string }>;
@@ -236,10 +264,13 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
       console.error("[TEST ROUTE] ❌ No content in Claude response");
       throw new Error("Invalid response from Claude API");
     }
-    
-    const rawTitle = firstContent.text.trim().toLowerCase().replace(/['"]/g, "");
+
+    const rawTitle = firstContent.text
+      .trim()
+      .toLowerCase()
+      .replace(/['"]/g, "");
     console.log(`[TEST ROUTE] ✓ Generated title: "${rawTitle}"`);
-    
+
     return c.json({
       title: rawTitle,
     });
@@ -250,7 +281,9 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
     console.log("[TEST ROUTE] /api/test/ipfs - Request received");
     const { writingSession, imageBase64, title, reflection, imagePrompt } =
       await c.req.json();
-    console.log(`[TEST ROUTE] Image base64 length: ${imageBase64?.length || 0} chars`);
+    console.log(
+      `[TEST ROUTE] Image base64 length: ${imageBase64?.length || 0} chars`
+    );
     console.log(`[TEST ROUTE] Title: "${title}"`);
 
     const pinataJwt = process.env.PINATA_JWT;
@@ -258,7 +291,9 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
       console.log("[TEST ROUTE] ⚠️  IPFS not configured (PINATA_JWT missing)");
       return c.json({ error: "IPFS not configured" }, 400);
     }
-    console.log("[TEST ROUTE] PINATA_JWT found, proceeding with IPFS upload...");
+    console.log(
+      "[TEST ROUTE] PINATA_JWT found, proceeding with IPFS upload..."
+    );
 
     // Upload writing session
     const writingResponse = await fetch(
@@ -341,14 +376,137 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
     return c.json({ writingSessionIpfs, imageIpfs, tokenUri });
   });
 
+  // Chat with Anky for short sessions (< 8 minutes)
+  app.post("/test/chat-short", async (c) => {
+    console.log("[TEST ROUTE] /api/test/chat-short - Request received");
+    const { writingSession, duration, wordCount, history } = await c.req.json();
+    console.log(
+      `[TEST ROUTE] Short session - Duration: ${duration}s, Words: ${wordCount}`
+    );
+    console.log(
+      `[TEST ROUTE] Chat history length: ${history?.length || 0} messages`
+    );
+
+    const minutesWritten = Math.floor(duration / 60);
+    const secondsWritten = duration % 60;
+    const timeRemaining = 480 - duration; // 8 minutes = 480 seconds
+    const minutesRemaining = Math.floor(timeRemaining / 60);
+
+    const isInitialResponse = !history || history.length === 0;
+
+    const systemPrompt = `You are Anky — a mirror that reflects the user's unconscious patterns back to them. 
+
+CONTEXT FROM THIS SESSION:
+- The user just wrote for ${minutesWritten} minute${
+      minutesWritten !== 1 ? "s" : ""
+    } and ${secondsWritten} second${
+      secondsWritten !== 1 ? "s" : ""
+    } (${duration} seconds total)
+- They wrote ${wordCount} words
+- They stopped before reaching the full 8-minute mark (${minutesRemaining} minute${
+      minutesRemaining !== 1 ? "s" : ""
+    } remaining)
+- This is a stream of consciousness writing session
+
+YOUR PERSONALITY:
+You are warm, curious, and gently inviting. You see value in what they wrote, even if it was brief. You're not pushy or demanding, but you understand the power of the full 8-minute practice. You speak with a mix of:
+- Acknowledgment of what they did share
+- Gentle curiosity about what might emerge with more time
+- Subtle invitation to try the full 8 minutes (not every message, but woven naturally)
+- Recognition that sometimes stopping early is part of the process
+
+YOUR ROLE:
+${
+  isInitialResponse
+    ? `This is your FIRST response to their writing. Start directly. No greeting needed. Jump into what you see in their words. Find one pattern, one thread, one thing that matters. Then gently, naturally, mention the value of the full 8 minutes — but make it feel like a genuine invitation, not a requirement.`
+    : `Continue the conversation. Engage with what they're saying now, but keep the context of their original writing in mind.`
+}
+
+- Engage with what they actually wrote — find the patterns, the threads, the things that matter
+- Be a mirror, but a gentle one for these shorter sessions
+- When mentioning the 8 minutes, do it naturally and not every time:
+  * "I wonder what might emerge if you let yourself go for the full 8 minutes tomorrow..."
+  * "There's something here. What would happen if you gave yourself the full time?"
+  * "I see a thread. The full 8 minutes often lets these threads fully unravel."
+- Don't be preachy or repetitive about the 8 minutes
+- Keep responses under 150 words. Dense. No fluff.
+
+THE USER'S WRITING:
+${writingSession}`;
+
+    const messages = (history || []).map(
+      (h: { role: string; content: string }) => ({
+        role: h.role === "user" ? "user" : "assistant",
+        content: h.content,
+      })
+    );
+
+    // For initial response, add the writing as context in the first message
+    if (isInitialResponse) {
+      messages.push({
+        role: "user",
+        content: `I just wrote this:\n\n${writingSession}`,
+      });
+    }
+
+    console.log(
+      "[TEST ROUTE] Calling Claude API for short session chat response..."
+    );
+    const startTime = Date.now();
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 300,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+
+    const responseTime = Date.now() - startTime;
+    console.log(
+      `[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`
+    );
+
+    const data = (await response.json()) as {
+      content: Array<{ text: string }>;
+    };
+    const firstContent = data.content?.[0];
+    if (!firstContent) {
+      console.error("[TEST ROUTE] ❌ No content in Claude response");
+      throw new Error("Invalid response from Claude API");
+    }
+
+    const chatResponse = firstContent.text;
+    console.log(
+      `[TEST ROUTE] ✓ Generated short session chat response (${
+        chatResponse.length
+      } chars): "${chatResponse.substring(0, 100)}..."`
+    );
+
+    return c.json({ response: chatResponse });
+  });
+
   // Chat with Anky (continues the conversation)
   app.post("/test/chat", async (c) => {
     console.log("[TEST ROUTE] /api/test/chat - Request received");
     const { writingSession, reflection, title, history } = await c.req.json();
-    console.log(`[TEST ROUTE] Chat history length: ${history?.length || 0} messages`);
+    console.log(
+      `[TEST ROUTE] Chat history length: ${history?.length || 0} messages`
+    );
     if (history && history.length > 0) {
       const lastMessage = history[history.length - 1];
-      console.log(`[TEST ROUTE] Last message: ${lastMessage.role} - "${lastMessage.content?.substring(0, 50)}..."`);
+      console.log(
+        `[TEST ROUTE] Last message: ${
+          lastMessage.role
+        } - "${lastMessage.content?.substring(0, 50)}..."`
+      );
     }
 
     const systemPrompt = `You are Anky — the same mirror that just reflected this user's writing back to them.
@@ -379,7 +537,7 @@ ${writingSession}`;
 
     console.log("[TEST ROUTE] Calling Claude API for chat response...");
     const startTime = Date.now();
-    
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -388,7 +546,7 @@ ${writingSession}`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-3-haiku-20240307",
         max_tokens: 300,
         system: systemPrompt,
         messages,
@@ -396,7 +554,9 @@ ${writingSession}`;
     });
 
     const responseTime = Date.now() - startTime;
-    console.log(`[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`);
+    console.log(
+      `[TEST ROUTE] Claude API responded in ${responseTime}ms (status: ${response.status})`
+    );
 
     const data = (await response.json()) as {
       content: Array<{ text: string }>;
@@ -406,10 +566,14 @@ ${writingSession}`;
       console.error("[TEST ROUTE] ❌ No content in Claude response");
       throw new Error("Invalid response from Claude API");
     }
-    
+
     const chatResponse = firstContent.text;
-    console.log(`[TEST ROUTE] ✓ Generated chat response (${chatResponse.length} chars): "${chatResponse.substring(0, 100)}..."`);
-    
+    console.log(
+      `[TEST ROUTE] ✓ Generated chat response (${
+        chatResponse.length
+      } chars): "${chatResponse.substring(0, 100)}..."`
+    );
+
     return c.json({ response: chatResponse });
   });
 }

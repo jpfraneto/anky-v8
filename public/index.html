@@ -94,6 +94,10 @@
         color: var(--gold);
         border-color: rgba(251, 191, 36, 0.3);
       }
+      .wallet-btn.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
 
       /* Main */
       .main {
@@ -136,7 +140,7 @@
       .writing-container {
         width: 100%;
         max-width: 48rem;
-        transition: all 0.4s;
+        transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .writing-container.fullscreen {
         position: fixed;
@@ -147,6 +151,9 @@
         flex-direction: column;
         z-index: 10;
         background: var(--bg);
+      }
+      .writing-container.transitioning {
+        transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .writing-area {
         width: 100%;
@@ -222,21 +229,21 @@
       .stats.visible {
         opacity: 1;
       }
-      
+
       /* Left stats - words, WPM, timer */
       .stats-left {
         display: flex;
         gap: 1rem;
         align-items: center;
       }
-      
+
       /* Right stats - key counters */
       .stats-right {
         display: flex;
         gap: 0.75rem;
         align-items: center;
       }
-      
+
       .stat-item {
         display: flex;
         align-items: center;
@@ -270,22 +277,22 @@
         z-index: 30;
         animation: keyFloat 2s ease-out forwards;
       }
-      
+
       .key-effect.backspace {
         color: var(--danger);
         text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
       }
-      
+
       .key-effect.enter {
         color: var(--purple);
         text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
       }
-      
+
       .key-effect.arrow {
         color: var(--yellow);
         text-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
       }
-      
+
       @keyframes keyFloat {
         0% {
           opacity: 1;
@@ -300,15 +307,15 @@
           transform: translateY(-40px) scale(0.8);
         }
       }
-      
+
       /* Text markers for key positions */
       .text-marker {
         display: inline;
         position: relative;
       }
-      
+
       .text-marker.backspace::after {
-        content: '⌫';
+        content: "⌫";
         position: absolute;
         top: -0.5em;
         right: -0.3em;
@@ -317,9 +324,9 @@
         opacity: 0.3;
         pointer-events: none;
       }
-      
+
       .text-marker.enter::after {
-        content: '↵';
+        content: "↵";
         position: absolute;
         top: -0.5em;
         right: -0.3em;
@@ -328,9 +335,9 @@
         opacity: 0.3;
         pointer-events: none;
       }
-      
+
       .text-marker.arrow::after {
-        content: '→';
+        content: "→";
         position: absolute;
         top: -0.5em;
         right: -0.3em;
@@ -485,6 +492,376 @@
         white-space: pre-wrap;
         word-wrap: break-word;
       }
+
+      /* Dashboard (3-column layout after writing ends) */
+      .dashboard {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: var(--bg);
+        display: none;
+        grid-template-columns: 1fr 300px 1fr;
+        gap: 1px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .dashboard.visible {
+        display: grid;
+      }
+      .panel {
+        background: var(--bg);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .panel-header {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        margin-bottom: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      /* Left Panel - Writing Display */
+      .writing-display {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        padding: 0.75rem;
+        font-family: "Inter", monospace;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0.5rem;
+        resize: none;
+        outline: none;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      /* Middle Panel - Pipeline */
+      .pipeline-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .session-stats {
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.7rem;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+      }
+      .stat-row:last-child {
+        margin-bottom: 0;
+      }
+      .pipeline {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .pipeline-step {
+        padding: 0.6rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0.5rem;
+        font-size: 0.7rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        transition: all 0.3s;
+        flex-shrink: 0;
+      }
+      .pipeline-step.active {
+        border-color: var(--gold);
+        background: rgba(251, 191, 36, 0.05);
+      }
+      .pipeline-step.done {
+        border-color: var(--green);
+        background: rgba(74, 222, 128, 0.05);
+      }
+      .pipeline-step.error {
+        border-color: var(--danger);
+        background: rgba(248, 113, 113, 0.05);
+      }
+      .step-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .step-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        flex-shrink: 0;
+      }
+      .pipeline-step.active .step-icon {
+        background: var(--gold);
+        color: var(--bg);
+      }
+      .pipeline-step.done .step-icon {
+        background: var(--green);
+        color: var(--bg);
+      }
+      .pipeline-step.error .step-icon {
+        background: var(--danger);
+        color: var(--bg);
+      }
+      .step-label {
+        flex: 1;
+        color: var(--muted);
+      }
+      .pipeline-step.active .step-label,
+      .pipeline-step.done .step-label {
+        color: var(--fg);
+      }
+      .step-time {
+        font-family: "Inter", monospace;
+        font-size: 0.65rem;
+        color: var(--muted);
+        padding-left: 28px;
+        margin-top: -0.25rem;
+      }
+      .pipeline-connector {
+        width: 1px;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        margin-left: 10px;
+        flex-shrink: 0;
+      }
+
+      /* Blocked state for < 8 minutes */
+      .pipeline-blocked {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        opacity: 0.3;
+        text-align: center;
+        padding: 2rem;
+      }
+      .blocked-message {
+        font-size: 0.75rem;
+        line-height: 1.6;
+        max-width: 200px;
+      }
+
+      /* Right Panel - Output + Chat */
+      .output-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .output-content.has-image {
+        gap: 1.5rem;
+        overflow-y: auto;
+      }
+      .output-image {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.03);
+        border: none;
+        border-radius: 0.75rem;
+        display: none;
+        flex-shrink: 0;
+      }
+      .output-image.visible {
+        display: block;
+      }
+      .image-placeholder {
+        width: 100%;
+        aspect-ratio: 1;
+        background: rgba(255, 255, 255, 0.03);
+        border: none;
+        border-radius: 0.75rem;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 0.75rem;
+        flex-shrink: 0;
+      }
+      .output-title {
+        font-size: 1.5rem;
+        font-weight: 300;
+        color: var(--fg);
+        text-align: center;
+        letter-spacing: 0.02em;
+        line-height: 1.4;
+        margin: 0;
+        flex-shrink: 0;
+        display: none;
+      }
+      .output-title.visible {
+        display: block;
+      }
+      .output-reflection {
+        font-size: 0.9rem;
+        line-height: 1.8;
+        color: rgba(250, 250, 250, 0.95);
+        white-space: pre-wrap;
+        flex-shrink: 0;
+        display: none;
+      }
+      .output-reflection.visible {
+        display: block;
+      }
+
+      /* Chat Section */
+      .chat-section {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        gap: 0.75rem;
+      }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+        min-height: 0;
+      }
+      .chat-message {
+        padding: 0.6rem;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .chat-message.user {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-left: 2rem;
+      }
+      .chat-message.anky {
+        background: rgba(251, 191, 36, 0.05);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        margin-right: 2rem;
+      }
+      .chat-timestamp {
+        font-size: 0.65rem;
+        color: var(--muted);
+        margin-top: 0.25rem;
+        font-style: italic;
+      }
+      .chat-thinking {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem;
+        background: rgba(251, 191, 36, 0.05);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--gold);
+        margin-right: 2rem;
+      }
+      .chat-thinking .spinner {
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(251, 191, 36, 0.2);
+        border-top-color: var(--gold);
+      }
+      .chat-input-wrapper {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .chat-input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        font-family: "Inter", sans-serif;
+        font-size: 0.85rem;
+        color: var(--fg);
+        background: rgba(17, 17, 19, 0.5);
+        border: 1px solid rgba(31, 31, 35, 0.5);
+        border-radius: 2rem;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .chat-input:focus {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(251, 191, 36, 0.3);
+      }
+      .chat-input::placeholder {
+        color: var(--muted);
+      }
+      .chat-send {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 400;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        flex-shrink: 0;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .chat-send:hover {
+        color: var(--gold);
+        background: rgba(251, 191, 36, 0.1);
+      }
+      .chat-send:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Add green color */
+      :root {
+        --green: #4ade80;
+      }
+
+      /* Mint actions at bottom of right panel */
+      .mint-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-direction: column;
+        margin-top: 1rem;
+        flex-shrink: 0;
+      }
+      .mint-actions .btn {
+        width: 100%;
+      }
     </style>
   </head>
   <body>
@@ -577,6 +954,152 @@
       </div>
     </div>
 
+    <!-- Dashboard (3-column layout after writing ends) -->
+    <div class="dashboard" id="dashboard">
+      <!-- Left Panel: Your Writing -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>your writing</span>
+        </div>
+        <div class="writing-display" id="writingDisplay"></div>
+      </div>
+
+      <!-- Middle Panel: Pipeline/Stats -->
+      <div class="panel">
+        <div class="panel-header">pipeline</div>
+        <div class="pipeline-content" id="pipelineContent">
+          <!-- Session Stats -->
+          <div class="session-stats" id="sessionStatsDisplay">
+            <div class="stat-row">
+              <span>Words:</span>
+              <span id="statsWords">—</span>
+            </div>
+            <div class="stat-row">
+              <span>Duration:</span>
+              <span id="statsDuration">—</span>
+            </div>
+            <div class="stat-row">
+              <span>WPM:</span>
+              <span id="statsWPM">—</span>
+            </div>
+          </div>
+
+          <!-- Blocked State (for < 8 min sessions) -->
+          <div
+            class="pipeline-blocked"
+            id="pipelineBlocked"
+            style="display: none"
+          >
+            <div class="blocked-message">
+              write for more than 8 minutes to unlock the magic
+            </div>
+          </div>
+
+          <!-- Pipeline Steps (for >= 8 min sessions) -->
+          <div class="pipeline" id="pipeline" style="display: none">
+            <div class="pipeline-step" data-step="prompt">
+              <div class="step-content">
+                <div class="step-icon">1</div>
+                <span class="step-label">image prompt</span>
+              </div>
+              <span class="step-time" id="time-prompt">—</span>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="reflection">
+              <div class="step-content">
+                <div class="step-icon">2</div>
+                <span class="step-label">reflection</span>
+              </div>
+              <span class="step-time" id="time-reflection">—</span>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="image">
+              <div class="step-content">
+                <div class="step-icon">3</div>
+                <span class="step-label">generate image</span>
+              </div>
+              <span class="step-time" id="time-image">—</span>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="title">
+              <div class="step-content">
+                <div class="step-icon">4</div>
+                <span class="step-label">title</span>
+              </div>
+              <span class="step-time" id="time-title">—</span>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="pipeline-step" data-step="ipfs">
+              <div class="step-content">
+                <div class="step-icon">5</div>
+                <span class="step-label">ipfs upload</span>
+              </div>
+              <span class="step-time" id="time-ipfs">—</span>
+            </div>
+          </div>
+
+          <div
+            id="writeAgainButtonContainer"
+            style="display: none; margin-top: 1rem"
+          >
+            <button class="btn btn-secondary" onclick="writeAgain()">
+              write again
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Output + Chat -->
+      <div class="panel">
+        <div class="panel-header">output</div>
+        <div class="output-content" id="dashboardOutput">
+          <div class="image-placeholder" id="dashboardImagePlaceholder">
+            waiting for generation...
+          </div>
+          <img
+            class="output-image"
+            id="dashboardOutputImage"
+            src=""
+            alt="Generated Anky"
+          />
+          <div class="output-title" id="dashboardOutputTitle">—</div>
+          <div class="output-reflection" id="dashboardOutputReflection">—</div>
+
+          <!-- Chat Section - Always visible -->
+          <div class="chat-section" id="dashboardChatSection">
+            <div class="chat-messages" id="dashboardChatMessages"></div>
+            <div class="chat-input-wrapper">
+              <input
+                type="text"
+                class="chat-input"
+                id="dashboardChatInput"
+                placeholder="continue with anky..."
+              />
+              <button class="chat-send" id="dashboardChatSend">→</button>
+            </div>
+          </div>
+
+          <!-- Mint Actions -->
+          <div
+            class="mint-actions"
+            id="dashboardMintActions"
+            style="display: none"
+          >
+            <button class="btn btn-secondary" onclick="writeAgain()">
+              write again (delete writing forever)
+            </button>
+            <button
+              class="btn btn-primary"
+              id="dashboardMintBtn"
+              onclick="mintAnky()"
+            >
+              mint anky
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module">
       // ============================================
       // WALLET CONNECTION (using viem via CDN)
@@ -642,8 +1165,8 @@
           const btn = document.getElementById("walletBtn");
           btn.textContent = `${walletAddress.slice(
             0,
-            6
-          )}...${walletAddress.slice(-4)}`;
+            4
+          )}___${walletAddress.slice(-4)}`;
           btn.classList.add("connected");
 
           // Switch to Base if needed
@@ -834,8 +1357,8 @@
           if (isWriting) {
             backspaceCount++;
             updateRightStats();
-            createFloatingEffect('⌫', 'backspace');
-            createTextMarker('backspace');
+            createFloatingEffect("⌫", "backspace");
+            createTextMarker("backspace");
           }
         }
 
@@ -844,8 +1367,8 @@
           if (isWriting) {
             enterCount++;
             updateRightStats();
-            createFloatingEffect('↵', 'enter');
-            createTextMarker('enter');
+            createFloatingEffect("↵", "enter");
+            createTextMarker("enter");
           }
         }
 
@@ -855,8 +1378,8 @@
           if (isWriting) {
             arrowCount++;
             updateRightStats();
-            createFloatingEffect('→', 'arrow');
-            createTextMarker('arrow');
+            createFloatingEffect("→", "arrow");
+            createTextMarker("arrow");
           }
           e.preventDefault();
           keepCursorAtEnd();
@@ -882,6 +1405,9 @@
         writingContainer.classList.add("fullscreen");
         timerContainer.classList.add("visible");
         stats.classList.add("visible");
+
+        // Hide wallet button during writing
+        document.getElementById("walletBtn").classList.add("hidden");
 
         // Reset counters
         updateRightStats();
@@ -912,6 +1438,8 @@
 
         const content = writingArea.value;
         const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+        const wpm = elapsed > 0 ? Math.round((wordCount / elapsed) * 60) : 0;
 
         clearTimeout(inactivityTimeout);
         clearInterval(timerInterval);
@@ -920,7 +1448,7 @@
 
         // Save session to local storage
         const sessionStats = {
-          wordCount: content.trim().split(/\s+/).filter(Boolean).length,
+          wordCount,
           duration: elapsed,
           backspaceCount,
           enterCount,
@@ -928,104 +1456,428 @@
         };
         saveSessionToLocalStorage(content, elapsed, sessionStats);
 
-        // Only generate anky if user wrote for more than 480 seconds
+        // Get current writing container position before any changes
+        const writingRect = writingContainer.getBoundingClientRect();
+
+        // Show dashboard and populate content first (but keep it visually hidden for transition)
+        document.getElementById("dashboard").classList.add("visible");
+        const writingDisplay = document.getElementById("writingDisplay");
+        writingDisplay.textContent = content;
+        writingDisplay.style.opacity = "0";
+
+        // Wait for dashboard to layout, then get target position
+        requestAnimationFrame(() => {
+          const leftPanel = writingDisplay.parentElement;
+          const leftPanelRect = leftPanel.getBoundingClientRect();
+
+          // Animate writing container transition to left panel
+          writingContainer.classList.add("transitioning");
+          writingContainer.classList.remove("fullscreen");
+
+          // Position writing container for smooth transition
+          writingContainer.style.position = "fixed";
+          writingContainer.style.left = `${writingRect.left}px`;
+          writingContainer.style.top = `${writingRect.top}px`;
+          writingContainer.style.width = `${writingRect.width}px`;
+          writingContainer.style.height = `${writingRect.height}px`;
+          writingContainer.style.zIndex = "200";
+          writingContainer.style.background = "var(--bg)";
+
+          // Trigger reflow
+          writingContainer.offsetHeight;
+
+          // Animate to left panel position
+          requestAnimationFrame(() => {
+            writingContainer.style.left = `${leftPanelRect.left}px`;
+            writingContainer.style.top = `${leftPanelRect.top + 40}px`; // Account for header
+            writingContainer.style.width = `${leftPanelRect.width - 32}px`; // Account for padding
+            writingContainer.style.height = `${leftPanelRect.height - 80}px`;
+            writingContainer.style.transform = "scale(0.98)";
+
+            setTimeout(() => {
+              // Fade in the left panel content
+              writingDisplay.style.transition = "opacity 0.4s";
+              writingDisplay.style.opacity = "1";
+
+              // Hide and reset writing container
+              setTimeout(() => {
+                writingContainer.style.display = "none";
+                writingContainer.classList.remove("transitioning");
+                writingContainer.style.position = "";
+                writingContainer.style.left = "";
+                writingContainer.style.top = "";
+                writingContainer.style.width = "";
+                writingContainer.style.height = "";
+                writingContainer.style.transform = "";
+                writingContainer.style.zIndex = "";
+                writingContainer.style.background = "";
+              }, 400);
+            }, 800);
+          });
+        });
+
+        // Populate middle panel with stats
+        document.getElementById("statsWords").textContent = wordCount;
+        document.getElementById("statsDuration").textContent =
+          formatDuration(elapsed);
+        document.getElementById("statsWPM").textContent = wpm;
+
+        // Store session data globally for chat
+        window.currentSessionData = {
+          content,
+          elapsed,
+          wordCount,
+          wpm,
+          isShortSession: elapsed < ANKY_THRESHOLD,
+        };
+
+        // Check if session meets requirements for generation
         if (content.trim().length >= 100 && elapsed >= ANKY_THRESHOLD) {
-          // Show generation overlay
-          generationOverlay.classList.add("visible");
+          // Show pipeline, hide blocked message
+          document.getElementById("pipelineBlocked").style.display = "none";
+          document.getElementById("pipeline").style.display = "flex";
+          document.getElementById("writeAgainButtonContainer").style.display =
+            "none";
 
-          // Show loading with session content
-          result.classList.add("visible");
-          loading.classList.add("visible");
-          resultDisplay.style.display = "none";
-          sessionReading.style.display = "block";
-          sessionReadingContent.textContent = content;
-
-          try {
-            // Generate via API
-            const response = await fetch("/api/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                writingSession: content.trim(),
-                locale: navigator.language,
-                walletAddress: walletAddress,
-              }),
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            // Store for minting
-            currentAnkyData = data;
-
-            // Hide generation overlay
-            generationOverlay.classList.remove("visible");
-
-            // Display result
-            document.getElementById("resultImage").src = data.imageUrl;
-            document.getElementById("resultTitle").textContent = data.title;
-            document.getElementById("resultReflection").textContent =
-              data.reflection;
-
-            loading.classList.remove("visible");
-            sessionReading.style.display = "none";
-            resultDisplay.style.display = "block";
-
-            // Reset mint button
-            const mintBtn = document.getElementById("mintBtn");
-            mintBtn.disabled = false;
-            mintBtn.textContent = "mint anky";
-          } catch (e) {
-            console.error("Generation failed:", e);
-            generationOverlay.classList.remove("visible");
-            loading.innerHTML = `<p style="color: var(--danger);">Generation failed: ${e.message}</p>
-            <button class="btn btn-secondary" onclick="writeAgain()" style="margin-top: 1rem;">try again</button>`;
-            sessionReading.style.display = "none";
-          }
+          // Start generation process with pipeline visualization
+          await generateAnkyWithPipeline(content);
         } else {
-          // Session ended but didn't meet requirements
+          // Session too short - show blocked state in middle panel only
+          document.getElementById("pipeline").style.display = "none";
+          document.getElementById("pipelineBlocked").style.display = "flex";
+
+          // Show write again button only if less than 8 minutes
           if (elapsed < ANKY_THRESHOLD) {
-            alert(
-              `Session saved! You wrote for ${formatDuration(
-                elapsed
-              )}. You need to write for at least ${formatDuration(
-                ANKY_THRESHOLD
-              )} to generate an Anky.`
-            );
+            document.getElementById("writeAgainButtonContainer").style.display =
+              "block";
+          } else {
+            document.getElementById("writeAgainButtonContainer").style.display =
+              "none";
           }
-          writeAgain();
+
+          // Hide image/title/reflection placeholders for short sessions
+          document.getElementById("dashboardImagePlaceholder").style.display =
+            "none";
+          document.getElementById("dashboardOutputTitle").style.display =
+            "none";
+          document.getElementById("dashboardOutputReflection").style.display =
+            "none";
+
+          // Remove has-image class so chat takes full space
+          document
+            .getElementById("dashboardOutput")
+            .classList.remove("has-image");
+
+          // Hide mint actions for short sessions
+          document.getElementById("dashboardMintActions").style.display =
+            "none";
+
+          // Reset chat history for short sessions and fetch initial response
+          dashboardChatHistory = [];
+
+          // Automatically fetch Anky's initial response for short sessions
+          await fetchInitialAnkyResponse(content, elapsed, wordCount);
+        }
+      }
+
+      async function fetchInitialAnkyResponse(content, elapsed, wordCount) {
+        // Show thinking indicator
+        const thinkingEl = document.createElement("div");
+        thinkingEl.className = "chat-thinking";
+        thinkingEl.id = "ankyInitialThinking";
+        thinkingEl.innerHTML =
+          '<div class="spinner"></div><span>anky is reading and thinking...</span>';
+        dashboardChatMessages.appendChild(thinkingEl);
+        dashboardChatMessages.scrollTop = dashboardChatMessages.scrollHeight;
+
+        try {
+          const response = await fetch("/api/test/chat-short", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              writingSession: content,
+              duration: elapsed,
+              wordCount: wordCount,
+              history: [], // Initial response, no history yet
+            }),
+          });
+
+          const data = await response.json();
+
+          // Remove thinking indicator
+          thinkingEl.remove();
+
+          // Add Anky's initial response to chat
+          dashboardChatHistory.push({
+            role: "assistant",
+            content: data.response,
+          });
+          addMessageToDashboardChat("anky", data.response, 0);
+        } catch (e) {
+          thinkingEl.remove();
+          addMessageToDashboardChat("anky", `Error: ${e.message}`, 0);
+        }
+      }
+
+      async function generateAnkyWithPipeline(content) {
+        let chatHistory = [];
+
+        try {
+          // Update placeholder
+          document.getElementById("dashboardImagePlaceholder").textContent =
+            "generating...";
+
+          // Step 1 & 2: Parallel - Image Prompt + Reflection
+          setStepActive("prompt");
+          setStepActive("reflection");
+
+          const startParallel = Date.now();
+
+          const [promptResult, reflectionResult] = await Promise.all([
+            fetchStep("/api/test/prompt", { writingSession: content }),
+            fetchStep("/api/test/reflection", {
+              writingSession: content,
+              locale: navigator.language,
+            }),
+          ]);
+
+          const parallelTime = Date.now() - startParallel;
+          setStepDone("prompt", parallelTime);
+          setStepDone("reflection", parallelTime);
+
+          // Step 3: Generate Image
+          setStepActive("image");
+          const imageStart = Date.now();
+          const imageResult = await fetchStep("/api/test/image", {
+            prompt: promptResult.prompt,
+          });
+          setStepDone("image", Date.now() - imageStart);
+
+          // Show image immediately
+          document.getElementById("dashboardOutputImage").src = imageResult.url;
+          document
+            .getElementById("dashboardOutputImage")
+            .classList.add("visible");
+          document.getElementById("dashboardImagePlaceholder").style.display =
+            "none";
+
+          // Add class to output-content to enable scrolling when image is present
+          document.getElementById("dashboardOutput").classList.add("has-image");
+
+          // Show reflection
+          const reflectionEl = document.getElementById(
+            "dashboardOutputReflection"
+          );
+          reflectionEl.textContent = reflectionResult.reflection;
+          reflectionEl.classList.add("visible");
+
+          // Automatically add reflection as Anky's first message in chat
+          dashboardChatHistory.push({
+            role: "assistant",
+            content: reflectionResult.reflection,
+          });
+          addMessageToDashboardChat("anky", reflectionResult.reflection, 0);
+
+          // Step 4: Generate Title
+          setStepActive("title");
+          const titleStart = Date.now();
+          const titleResult = await fetchStep("/api/test/title", {
+            writingSession: content,
+            imagePrompt: promptResult.prompt,
+            reflection: reflectionResult.reflection,
+          });
+          setStepDone("title", Date.now() - titleStart);
+
+          // Show title
+          const titleEl = document.getElementById("dashboardOutputTitle");
+          titleEl.textContent = titleResult.title;
+          titleEl.classList.add("visible");
+
+          // Step 5: IPFS (optional)
+          setStepActive("ipfs");
+          const ipfsStart = Date.now();
+          try {
+            const ipfsResult = await fetchStep("/api/test/ipfs", {
+              writingSession: content,
+              imageBase64: imageResult.base64,
+              title: titleResult.title,
+              reflection: reflectionResult.reflection,
+              imagePrompt: promptResult.prompt,
+            });
+            setStepDone("ipfs", Date.now() - ipfsStart);
+
+            currentAnkyData = {
+              writingSession: content,
+              ...promptResult,
+              ...reflectionResult,
+              ...imageResult,
+              ...titleResult,
+              ...ipfsResult,
+            };
+          } catch (e) {
+            // IPFS is optional
+            setStepError("ipfs", e.message);
+            currentAnkyData = {
+              writingSession: content,
+              ...promptResult,
+              ...reflectionResult,
+              ...imageResult,
+              ...titleResult,
+            };
+          }
+
+          // Show mint actions (chat is always visible)
+          document.getElementById("dashboardMintActions").style.display =
+            "flex";
+          document.getElementById("dashboardMintBtn").style.display = "block";
+
+          // Reset mint button
+          const dashboardMintBtn = document.getElementById("dashboardMintBtn");
+          dashboardMintBtn.disabled = false;
+          dashboardMintBtn.textContent = "mint anky";
+
+          // Store chat history for this session
+          chatHistory = [];
+        } catch (e) {
+          console.error("Generation failed:", e);
+          setStepError("image", e.message);
+          document.getElementById(
+            "dashboardImagePlaceholder"
+          ).textContent = `Error: ${e.message}`;
+          document.getElementById("dashboardImagePlaceholder").style.display =
+            "flex";
+
+          // Show write again button
+          document.getElementById("dashboardMintActions").style.display =
+            "flex";
+          document.getElementById("dashboardMintBtn").style.display = "none";
+        }
+      }
+
+      async function fetchStep(url, body) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error);
+        }
+
+        return response.json();
+      }
+
+      function resetPipeline() {
+        document.querySelectorAll(".pipeline-step").forEach((step) => {
+          step.classList.remove("active", "done", "error");
+        });
+        document.querySelectorAll(".step-time").forEach((time) => {
+          time.textContent = "—";
+        });
+      }
+
+      function setStepActive(stepName) {
+        const step = document.querySelector(`[data-step="${stepName}"]`);
+        if (step) {
+          step.classList.add("active");
+          const stepContent = step.querySelector(".step-content");
+          if (stepContent) {
+            stepContent.querySelector(".step-icon").innerHTML =
+              '<div class="spinner"></div>';
+          }
+        }
+      }
+
+      function setStepDone(stepName, timeMs) {
+        const step = document.querySelector(`[data-step="${stepName}"]`);
+        if (step) {
+          step.classList.remove("active");
+          step.classList.add("done");
+          const stepContent = step.querySelector(".step-content");
+          if (stepContent) {
+            stepContent.querySelector(".step-icon").textContent = "✓";
+          }
+          document.getElementById(
+            `time-${stepName}`
+          ).textContent = `${timeMs}ms`;
+        }
+      }
+
+      function setStepError(stepName, error) {
+        const step = document.querySelector(`[data-step="${stepName}"]`);
+        if (step) {
+          step.classList.remove("active");
+          step.classList.add("error");
+          const stepContent = step.querySelector(".step-content");
+          if (stepContent) {
+            stepContent.querySelector(".step-icon").textContent = "✗";
+          }
+          document.getElementById(`time-${stepName}`).textContent = "error";
         }
       }
 
       window.writeAgain = function () {
-        result.classList.remove("visible");
-        generationOverlay.classList.remove("visible");
+        // Hide dashboard
+        document.getElementById("dashboard").classList.remove("visible");
+
+        // Show and reset writing interface
+        writingContainer.style.display = "block";
         hero.classList.remove("hidden");
         feed.classList.remove("hidden");
         writingContainer.classList.remove("fullscreen");
         timerContainer.classList.remove("visible");
         stats.classList.remove("visible");
 
+        // Show wallet button again
+        document.getElementById("walletBtn").classList.remove("hidden");
+
+        // Reset writing area
         writingArea.value = "";
         timerBar.style.width = "100%";
         timerBar.classList.remove("danger");
         document.getElementById("wordCount").textContent = "0 words";
         document.getElementById("wpm").textContent = "0 WPM";
-        document.getElementById("timerText").textContent = "8.0s";
         document.getElementById("duration").textContent = "0:00";
         document.getElementById("ankyStatus").classList.remove("visible");
         updateRightStats();
 
-        // Reset loading state
-        loading.classList.remove("visible");
-        sessionReading.style.display = "none";
-        loading.innerHTML = `<div class="spinner"></div><p class="loading-text">creating your anky...</p>`;
-        resultDisplay.style.display = "none";
+        // Reset dashboard state
+        document.getElementById("writingDisplay").textContent = "";
+        document
+          .getElementById("dashboardOutputImage")
+          .classList.remove("visible");
+        document.getElementById("dashboardOutputImage").src = "";
+        document
+          .getElementById("dashboardOutputImage")
+          .classList.remove("visible");
+        document.getElementById("dashboardImagePlaceholder").style.display =
+          "none";
+        document.getElementById("dashboardOutputTitle").textContent = "—";
+        document
+          .getElementById("dashboardOutputTitle")
+          .classList.remove("visible");
+        document.getElementById("dashboardOutputReflection").textContent = "—";
+        document
+          .getElementById("dashboardOutputReflection")
+          .classList.remove("visible");
+        document
+          .getElementById("dashboardOutput")
+          .classList.remove("has-image");
+        document.getElementById("dashboardChatMessages").innerHTML = "";
+        document.getElementById("dashboardChatInput").value = "";
+        document.getElementById("dashboardMintActions").style.display = "none";
+        document.getElementById("writeAgainButtonContainer").style.display =
+          "none";
+        resetPipeline();
+
+        // Hide old result overlay (if visible)
+        result.classList.remove("visible");
+        generationOverlay.classList.remove("visible");
 
         currentAnkyData = null;
+        window.currentSessionData = null;
         backspaceCount = 0;
         enterCount = 0;
         arrowCount = 0;
@@ -1073,11 +1925,12 @@
         document.getElementById("wordCount").textContent = `${words} word${
           words !== 1 ? "s" : ""
         }`;
-        
+
         // Calculate WPM
         if (isWriting && sessionStartTime) {
           const elapsedMinutes = (Date.now() - sessionStartTime) / 60000;
-          const wpm = elapsedMinutes > 0 ? Math.round(words / elapsedMinutes) : 0;
+          const wpm =
+            elapsedMinutes > 0 ? Math.round(words / elapsedMinutes) : 0;
           document.getElementById("wpm").textContent = `${wpm} WPM`;
         }
       }
@@ -1087,20 +1940,20 @@
       }
 
       function createFloatingEffect(symbol, type) {
-        const effect = document.createElement('div');
+        const effect = document.createElement("div");
         effect.className = `key-effect ${type}`;
         effect.textContent = symbol;
-        
+
         // Position near the cursor/writing area
         const rect = writingArea.getBoundingClientRect();
         const x = rect.left + Math.random() * rect.width;
         const y = rect.top + rect.height / 2 + Math.random() * 100 - 50;
-        
-        effect.style.left = x + 'px';
-        effect.style.top = y + 'px';
-        
+
+        effect.style.left = x + "px";
+        effect.style.top = y + "px";
+
         document.body.appendChild(effect);
-        
+
         // Remove after animation
         setTimeout(() => {
           effect.remove();
@@ -1112,26 +1965,26 @@
         const cursorPos = writingArea.selectionStart;
         const textBefore = writingArea.value.substring(0, cursorPos);
         const textAfter = writingArea.value.substring(cursorPos);
-        
+
         // Create a temporary span to mark the position
-        const marker = document.createElement('span');
+        const marker = document.createElement("span");
         marker.className = `text-marker ${type}`;
-        marker.style.position = 'absolute';
-        marker.style.pointerEvents = 'none';
-        marker.style.opacity = '0.3';
-        marker.style.zIndex = '25';
-        
+        marker.style.position = "absolute";
+        marker.style.pointerEvents = "none";
+        marker.style.opacity = "0.3";
+        marker.style.zIndex = "25";
+
         // Position it over the writing area
         const rect = writingArea.getBoundingClientRect();
-        marker.style.left = (rect.left + Math.random() * rect.width) + 'px';
-        marker.style.top = (rect.top + Math.random() * rect.height) + 'px';
-        
+        marker.style.left = rect.left + Math.random() * rect.width + "px";
+        marker.style.top = rect.top + Math.random() * rect.height + "px";
+
         document.body.appendChild(marker);
-        
+
         // Fade out and remove
         setTimeout(() => {
-          marker.style.transition = 'opacity 1s';
-          marker.style.opacity = '0';
+          marker.style.transition = "opacity 1s";
+          marker.style.opacity = "0";
           setTimeout(() => marker.remove(), 1000);
         }, 500);
       }
@@ -1140,20 +1993,137 @@
         const backspaceEl = document.getElementById("backspaceCount");
         const enterEl = document.getElementById("enterCount");
         const arrowEl = document.getElementById("arrowCount");
-        
+
         // Update text and show/hide based on count
         backspaceEl.textContent = `⌫ ${backspaceCount}`;
-        backspaceEl.style.display = backspaceCount > 0 ? 'flex' : 'none';
-        
+        backspaceEl.style.display = backspaceCount > 0 ? "flex" : "none";
+
         enterEl.textContent = `↵ ${enterCount}`;
-        enterEl.style.display = enterCount > 0 ? 'flex' : 'none';
-        
+        enterEl.style.display = enterCount > 0 ? "flex" : "none";
+
         arrowEl.textContent = `←→ ${arrowCount}`;
-        arrowEl.style.display = arrowCount > 0 ? 'flex' : 'none';
+        arrowEl.style.display = arrowCount > 0 ? "flex" : "none";
       }
 
       // Focus on load
       writingArea.focus();
+
+      // ============================================
+      // CHAT WITH ANKY (Dashboard)
+      // ============================================
+      let dashboardChatHistory = [];
+      let lastMessageTime = Date.now();
+
+      const dashboardChatSend = document.getElementById("dashboardChatSend");
+      const dashboardChatInput = document.getElementById("dashboardChatInput");
+      const dashboardChatMessages = document.getElementById(
+        "dashboardChatMessages"
+      );
+
+      dashboardChatSend.addEventListener("click", sendDashboardMessage);
+      dashboardChatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendDashboardMessage();
+        }
+      });
+
+      async function sendDashboardMessage() {
+        const message = dashboardChatInput.value.trim();
+        const sessionData = window.currentSessionData;
+
+        // Allow chat even if no anky data (for short sessions)
+        if (!message || !sessionData) return;
+
+        const userMessageTime = Date.now();
+        const timeSinceLastMessage = Math.floor(
+          (userMessageTime - lastMessageTime) / 1000
+        );
+
+        // Add user message with timestamp
+        dashboardChatHistory.push({ role: "user", content: message });
+        addMessageToDashboardChat("user", message, timeSinceLastMessage);
+        dashboardChatInput.value = "";
+        dashboardChatSend.disabled = true;
+
+        // Show "thinking" indicator
+        const thinkingEl = document.createElement("div");
+        thinkingEl.className = "chat-thinking";
+        thinkingEl.id = "ankyThinking";
+        thinkingEl.innerHTML =
+          '<div class="spinner"></div><span>anky is reading and thinking...</span>';
+        dashboardChatMessages.appendChild(thinkingEl);
+        dashboardChatMessages.scrollTop = dashboardChatMessages.scrollHeight;
+
+        const ankyStartTime = Date.now();
+
+        try {
+          // Use different endpoint for short sessions
+          const endpoint = sessionData.isShortSession
+            ? "/api/test/chat-short"
+            : "/api/test/chat";
+
+          const requestBody = sessionData.isShortSession
+            ? {
+                writingSession: sessionData.content,
+                duration: sessionData.elapsed,
+                wordCount: sessionData.wordCount,
+                history: dashboardChatHistory,
+              }
+            : {
+                writingSession: currentAnkyData.writingSession,
+                reflection: currentAnkyData.reflection,
+                title: currentAnkyData.title,
+                history: dashboardChatHistory,
+              };
+
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+          });
+
+          const data = await response.json();
+
+          // Remove thinking indicator
+          thinkingEl.remove();
+
+          const ankyReplyTime = Math.floor((Date.now() - ankyStartTime) / 1000);
+
+          dashboardChatHistory.push({
+            role: "assistant",
+            content: data.response,
+          });
+          addMessageToDashboardChat("anky", data.response, ankyReplyTime);
+
+          lastMessageTime = Date.now();
+        } catch (e) {
+          thinkingEl.remove();
+          addMessageToDashboardChat("anky", `Error: ${e.message}`, 0);
+        }
+
+        dashboardChatSend.disabled = false;
+        dashboardChatInput.focus();
+      }
+
+      function addMessageToDashboardChat(role, content, timeToReply) {
+        const div = document.createElement("div");
+        div.className = `chat-message ${role}`;
+
+        const contentEl = document.createElement("div");
+        contentEl.textContent = content;
+        div.appendChild(contentEl);
+
+        if (timeToReply !== undefined && timeToReply > 0) {
+          const timestamp = document.createElement("div");
+          timestamp.className = "chat-timestamp";
+          timestamp.textContent = `${formatDuration(timeToReply)} to reply`;
+          div.appendChild(timestamp);
+        }
+
+        dashboardChatMessages.appendChild(div);
+        dashboardChatMessages.scrollTop = dashboardChatMessages.scrollHeight;
+      }
     </script>
   </body>
 </html>
