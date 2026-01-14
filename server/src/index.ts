@@ -15,7 +15,14 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000", "https://anky.bot"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://anky.bot",
+      "https://anky.app",
+      "https://www.anky.app",
+      "https://anky-v8.orbiter.website",
+    ],
     credentials: true,
   })
 );

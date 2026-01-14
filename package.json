@@ -1,23 +1,18 @@
 {
-  "name": "anky-server",
-  "version": "0.0.1",
+  "name": "anky-monorepo",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run src/server.ts",
-    "start": "bun run src/server.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@google/genai": "^1.34.0",
-    "hono": "^4.5.0",
-    "viem": "^2.21.3"
+    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
+    "dev:server": "cd server && bun run dev",
+    "dev:client": "cd client && bun run dev",
+    "build": "cd client && bun run build",
+    "start": "cd server && bun run start",
+    "db:push": "cd server && bunx prisma db push",
+    "db:studio": "cd server && bunx prisma studio"
   },
   "devDependencies": {
-    "@types/node": "^20.9.0",
-    "typescript": "^5.2.2"
-  },
-  "engines": {
-    "node": ">=18.14"
+    "concurrently": "^9.1.0"
   }
 }
