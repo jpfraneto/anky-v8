@@ -1,5 +1,8 @@
 import { Hono } from "hono";
-import { generateImageWithReferences, initAnkyReferences } from "./lib/imageGen.js";
+import {
+  generateImageWithReferences,
+  initAnkyReferences,
+} from "./lib/imageGen.js";
 
 // Initialize Anky reference images on startup
 initAnkyReferences();
@@ -50,9 +53,16 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
     }),
   });
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+
+  if (!response.ok) {
+    console.error("Claude API error:", response.status, data);
+    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+  }
+
   const firstContent = data.content?.[0];
   if (!firstContent) {
+    console.error("Unexpected Claude response:", data);
     throw new Error("Invalid response from Claude API");
   }
 
@@ -114,9 +124,16 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
     }),
   });
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+
+  if (!response.ok) {
+    console.error("Claude API error:", response.status, data);
+    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+  }
+
   const firstContent = data.content?.[0];
   if (!firstContent) {
+    console.error("Unexpected Claude response:", data);
     throw new Error("Invalid response from Claude API");
   }
 
@@ -175,9 +192,16 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
     }),
   });
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+
+  if (!response.ok) {
+    console.error("Claude API error:", response.status, data);
+    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+  }
+
   const firstContent = data.content?.[0];
   if (!firstContent) {
+    console.error("Unexpected Claude response:", data);
     throw new Error("Invalid response from Claude API");
   }
 
@@ -211,7 +235,7 @@ app.post("/ipfs", async (c) => {
           createdAt: new Date().toISOString(),
         },
       }),
-    }
+    },
   );
   const writingData = (await writingResponse.json()) as { IpfsHash: string };
   const writingSessionIpfs = writingData.IpfsHash;
@@ -223,7 +247,7 @@ app.post("/ipfs", async (c) => {
   formData.append("file", imageBlob, `anky-image-${Date.now()}.png`);
   formData.append(
     "pinataMetadata",
-    JSON.stringify({ name: `anky-image-${Date.now()}` })
+    JSON.stringify({ name: `anky-image-${Date.now()}` }),
   );
 
   const imageResponse = await fetch(
@@ -232,7 +256,7 @@ app.post("/ipfs", async (c) => {
       method: "POST",
       headers: { Authorization: `Bearer ${pinataJwt}` },
       body: formData,
-    }
+    },
   );
   const imageData = (await imageResponse.json()) as { IpfsHash: string };
   const imageIpfs = imageData.IpfsHash;
@@ -257,7 +281,7 @@ app.post("/ipfs", async (c) => {
           properties: { writing_session: `ipfs://${writingSessionIpfs}` },
         },
       }),
-    }
+    },
   );
   const metadataData = (await metadataResponse.json()) as { IpfsHash: string };
   const tokenUri = metadataData.IpfsHash;
@@ -310,7 +334,7 @@ ${writingSession}`;
     (h: { role: string; content: string }) => ({
       role: h.role === "user" ? "user" : "assistant",
       content: h.content,
-    })
+    }),
   );
 
   if (isInitialResponse) {
@@ -335,9 +359,16 @@ ${writingSession}`;
     }),
   });
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+
+  if (!response.ok) {
+    console.error("Claude API error:", response.status, data);
+    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+  }
+
   const firstContent = data.content?.[0];
   if (!firstContent) {
+    console.error("Unexpected Claude response:", data);
     throw new Error("Invalid response from Claude API");
   }
 
@@ -389,9 +420,16 @@ ${writingSession}`;
     }),
   });
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+
+  if (!response.ok) {
+    console.error("Claude API error:", response.status, data);
+    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+  }
+
   const firstContent = data.content?.[0];
   if (!firstContent) {
+    console.error("Unexpected Claude response:", data);
     throw new Error("Invalid response from Claude API");
   }
 

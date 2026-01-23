@@ -1,18 +1,18 @@
 {
-  "name": "anky-monorepo",
+  "name": "anky-indexer",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
-    "dev:server": "cd server && bun run dev",
-    "dev:client": "cd client && bun run dev",
-    "build": "cd client && bun run build",
-    "start": "cd server && bun run start",
-    "db:push": "cd server && bunx prisma db push",
-    "db:studio": "cd server && bunx prisma studio"
+    "dev": "bun run src/server.ts",
+    "start": "bun run src/server.ts",
+    "db:push": "bunx prisma db push",
+    "db:studio": "bunx prisma studio"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "@types/bun": "latest"
   }
 }
