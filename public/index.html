@@ -1591,7 +1591,7 @@
         dashboardChatMessages.scrollTop = dashboardChatMessages.scrollHeight;
 
         try {
-          const response = await fetch("/api/test/chat-short", {
+          const response = await fetch("/api/chat-short", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1634,8 +1634,8 @@
           const startParallel = Date.now();
 
           const [promptResult, reflectionResult] = await Promise.all([
-            fetchStep("/api/test/prompt", { writingSession: content }),
-            fetchStep("/api/test/reflection", {
+            fetchStep("/api/prompt", { writingSession: content }),
+            fetchStep("/api/reflection", {
               writingSession: content,
               locale: navigator.language,
             }),
@@ -1648,7 +1648,7 @@
           // Step 3: Generate Image
           setStepActive("image");
           const imageStart = Date.now();
-          const imageResult = await fetchStep("/api/test/image", {
+          const imageResult = await fetchStep("/api/image", {
             prompt: promptResult.prompt,
           });
           setStepDone("image", Date.now() - imageStart);
@@ -1681,7 +1681,7 @@
           // Step 4: Generate Title
           setStepActive("title");
           const titleStart = Date.now();
-          const titleResult = await fetchStep("/api/test/title", {
+          const titleResult = await fetchStep("/api/title", {
             writingSession: content,
             imagePrompt: promptResult.prompt,
             reflection: reflectionResult.reflection,
@@ -1697,7 +1697,7 @@
           setStepActive("ipfs");
           const ipfsStart = Date.now();
           try {
-            const ipfsResult = await fetchStep("/api/test/ipfs", {
+            const ipfsResult = await fetchStep("/api/ipfs", {
               writingSession: content,
               imageBase64: imageResult.base64,
               title: titleResult.title,
@@ -2060,8 +2060,8 @@
         try {
           // Use different endpoint for short sessions
           const endpoint = sessionData.isShortSession
-            ? "/api/test/chat-short"
-            : "/api/test/chat";
+            ? "/api/chat-short"
+            : "/api/chat";
 
           const requestBody = sessionData.isShortSession
             ? {
