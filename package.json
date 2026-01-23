@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "bun run src/server.ts",
     "start": "bun run src/server.ts",
-    "db:push": "bunx prisma db push",
-    "db:studio": "bunx prisma studio"
+    "db:generate": "bunx drizzle-kit generate",
+    "db:push": "bunx drizzle-kit push",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
     "@google/generative-ai": "^0.24.1",
-    "hono": "^4.0.0"
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.0.0",
+    "postgres": "^3.4.8"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.31.8"
   }
 }

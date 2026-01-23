@@ -3,6 +3,8 @@ import {
   generateImageWithReferences,
   initAnkyReferences,
 } from "./lib/imageGen.js";
+import { isDatabaseAvailable } from "../db/index.js";
+import * as dbOps from "../db/operations.js";
 
 // Initialize Anky reference images on startup
 initAnkyReferences();
@@ -434,6 +436,355 @@ ${writingSession}`;
   }
 
   return c.json({ response: firstContent.text });
+});
+
+// ============================================================================
+// DATABASE ENDPOINTS
+// ============================================================================
+
+// Check if database is available
+app.get("/db/status", (c) => {
+  return c.json({ available: isDatabaseAvailable() });
+});
+
+// ----------------------------------------------------------------------------
+// USER ENDPOINTS
+// ----------------------------------------------------------------------------
+
+// Get or create user by wallet address
+app.post("/users", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const { walletAddress } = await c.req.json();
+  if (!walletAddress) {
+    return c.json({ error: "walletAddress required" }, 400);
+  }
+
+  const user = await dbOps.getOrCreateUser(walletAddress);
+  return c.json({ user });
+});
+
+// Get user by wallet
+app.get("/users/:wallet", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const wallet = c.req.param("wallet");
+  const user = await dbOps.getUserByWallet(wallet);
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  return c.json({ user });
+});
+
+// Update user settings
+app.patch("/users/:userId/settings", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const userId = c.req.param("userId");
+  const { dayBoundaryHour, timezone } = await c.req.json();
+
+  const user = await dbOps.updateUserSettings(userId, { dayBoundaryHour, timezone });
+  return c.json({ user });
+});
+
+// Get user streak
+app.get("/users/:userId/streak", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const userId = c.req.param("userId");
+  const streak = await dbOps.getUserStreak(userId);
+
+  if (!streak) {
+    return c.json({ error: "Streak not found" }, 404);
+  }
+
+  return c.json({ streak });
+});
+
+// Get user's ankys library
+app.get("/users/:userId/ankys", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const userId = c.req.param("userId");
+  const limit = parseInt(c.req.query("limit") || "50");
+  const ankys = await dbOps.getUserAnkys(userId, limit);
+
+  return c.json({ ankys });
+});
+
+// Get user's writing sessions
+app.get("/users/:userId/sessions", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const userId = c.req.param("userId");
+  const limit = parseInt(c.req.query("limit") || "50");
+  const sessions = await dbOps.getUserWritingSessions(userId, limit);
+
+  return c.json({ sessions });
+});
+
+// Get user's conversations
+app.get("/users/:userId/conversations", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const userId = c.req.param("userId");
+  const limit = parseInt(c.req.query("limit") || "20");
+  const conversations = await dbOps.getUserConversations(userId, limit);
+
+  return c.json({ conversations });
+});
+
+// ----------------------------------------------------------------------------
+// SESSION ENDPOINTS
+// ----------------------------------------------------------------------------
+
+// Create writing session
+app.post("/sessions", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const {
+    userId,
+    content,
+    durationSeconds,
+    wordCount,
+    wordsPerMinute,
+    isPublic,
+    dayBoundaryHour,
+    timezone,
+  } = await c.req.json();
+
+  if (!content || durationSeconds === undefined || wordCount === undefined) {
+    return c.json({ error: "content, durationSeconds, wordCount required" }, 400);
+  }
+
+  const session = await dbOps.createWritingSession({
+    userId,
+    content,
+    durationSeconds,
+    wordCount,
+    wordsPerMinute,
+    isPublic,
+    dayBoundaryHour,
+    timezone,
+  });
+
+  return c.json({ session });
+});
+
+// Get session by ID
+app.get("/sessions/:sessionId", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const sessionId = c.req.param("sessionId");
+  const session = await dbOps.getWritingSession(sessionId);
+
+  if (!session) {
+    return c.json({ error: "Session not found" }, 404);
+  }
+
+  return c.json({ session });
+});
+
+// Get session by share ID (public link)
+app.get("/s/:shareId", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const shareId = c.req.param("shareId");
+  const session = await dbOps.getWritingSessionByShareId(shareId);
+
+  if (!session) {
+    return c.json({ error: "Session not found or private" }, 404);
+  }
+
+  return c.json({ session });
+});
+
+// Toggle session privacy
+app.patch("/sessions/:sessionId/privacy", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const sessionId = c.req.param("sessionId");
+  const { isPublic } = await c.req.json();
+
+  const session = await dbOps.toggleSessionPrivacy(sessionId, isPublic);
+  return c.json({ session });
+});
+
+// ----------------------------------------------------------------------------
+// ANKY ENDPOINTS
+// ----------------------------------------------------------------------------
+
+// Create anky for a session
+app.post("/ankys", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const params = await c.req.json();
+
+  if (!params.writingSessionId) {
+    return c.json({ error: "writingSessionId required" }, 400);
+  }
+
+  const anky = await dbOps.createAnky(params);
+  return c.json({ anky });
+});
+
+// Update anky
+app.patch("/ankys/:ankyId", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const ankyId = c.req.param("ankyId");
+  const updates = await c.req.json();
+
+  const anky = await dbOps.updateAnky(ankyId, updates);
+  return c.json({ anky });
+});
+
+// Get anky by session ID
+app.get("/sessions/:sessionId/anky", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const sessionId = c.req.param("sessionId");
+  const anky = await dbOps.getAnkyBySession(sessionId);
+
+  if (!anky) {
+    return c.json({ error: "Anky not found" }, 404);
+  }
+
+  return c.json({ anky });
+});
+
+// Record mint
+app.post("/ankys/:ankyId/mint", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const ankyId = c.req.param("ankyId");
+  const { txHash, tokenId } = await c.req.json();
+
+  if (!txHash || tokenId === undefined) {
+    return c.json({ error: "txHash and tokenId required" }, 400);
+  }
+
+  const anky = await dbOps.recordMint(ankyId, txHash, tokenId);
+  return c.json({ anky });
+});
+
+// Get public anky feed
+app.get("/feed", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const limit = parseInt(c.req.query("limit") || "50");
+  const offset = parseInt(c.req.query("offset") || "0");
+  const ankys = await dbOps.getPublicAnkyFeed(limit, offset);
+
+  return c.json({ ankys });
+});
+
+// ----------------------------------------------------------------------------
+// CONVERSATION ENDPOINTS
+// ----------------------------------------------------------------------------
+
+// Get or create conversation
+app.post("/conversations", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const { userId, writingSessionId } = await c.req.json();
+
+  const conversation = await dbOps.getOrCreateConversation({
+    userId,
+    writingSessionId,
+  });
+
+  return c.json({ conversation });
+});
+
+// Add message to conversation
+app.post("/conversations/:conversationId/messages", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const conversationId = c.req.param("conversationId");
+  const { role, content } = await c.req.json();
+
+  if (!role || !content) {
+    return c.json({ error: "role and content required" }, 400);
+  }
+
+  const result = await dbOps.addMessage(conversationId, role, content);
+
+  if (!result) {
+    return c.json({ error: "Conversation not found" }, 404);
+  }
+
+  if (result.capped) {
+    return c.json({
+      capped: true,
+      message: "You've talked enough here. Start a new conversation?",
+    });
+  }
+
+  return c.json({ message: result.message });
+});
+
+// Get conversation messages
+app.get("/conversations/:conversationId/messages", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const conversationId = c.req.param("conversationId");
+  const limit = parseInt(c.req.query("limit") || "100");
+  const messages = await dbOps.getConversationMessages(conversationId, limit);
+
+  return c.json({ messages });
+});
+
+// Close conversation
+app.post("/conversations/:conversationId/close", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const conversationId = c.req.param("conversationId");
+  const conversation = await dbOps.closeConversation(conversationId);
+
+  return c.json({ conversation });
 });
 
 export default app;

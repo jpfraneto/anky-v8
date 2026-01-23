@@ -1,0 +1,192 @@
+import { pgTable, text, timestamp, integer, boolean, uuid, jsonb, index } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+// Users - linked to wallet addresses (Farcaster ID optional for future)
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  walletAddress: text('wallet_address').notNull().unique(),
+  fid: integer('fid'), // Farcaster ID, optional
+  dayBoundaryHour: integer('day_boundary_hour').notNull().default(4), // Hour when "day" resets (0-23), default 4am
+  timezone: text('timezone').notNull().default('UTC'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('users_wallet_idx').on(table.walletAddress),
+  index('users_fid_idx').on(table.fid),
+]);
+
+// Writing Sessions - every time someone writes
+export const writingSessions = pgTable('writing_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id),
+
+  // The writing itself
+  content: text('content').notNull(),
+  durationSeconds: integer('duration_seconds').notNull(),
+  wordCount: integer('word_count').notNull(),
+  wordsPerMinute: integer('words_per_minute'),
+
+  // Is this a full Anky session (8+ minutes)?
+  isAnky: boolean('is_anky').notNull().default(false),
+
+  // Logical day tracking for streaks
+  // This is the "logical date" based on user's day boundary
+  // e.g., writing at 2am on Jan 5 with 4am boundary = Jan 4's logical day
+  logicalDate: timestamp('logical_date').notNull(),
+
+  // Shareable - generate a short link ID
+  shareId: text('share_id').unique(),
+  isPublic: boolean('is_public').notNull().default(true), // For privacy toggle
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('sessions_user_idx').on(table.userId),
+  index('sessions_logical_date_idx').on(table.logicalDate),
+  index('sessions_share_idx').on(table.shareId),
+  index('sessions_is_anky_idx').on(table.isAnky),
+]);
+
+// Ankys - generated from 8+ minute sessions
+export const ankys = pgTable('ankys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  writingSessionId: uuid('writing_session_id').notNull().references(() => writingSessions.id),
+  userId: uuid('user_id').references(() => users.id),
+
+  // AI Generated content
+  imagePrompt: text('image_prompt'),
+  reflection: text('reflection'),
+  title: text('title'),
+
+  // Image storage
+  imageBase64: text('image_base64'), // Temporary, cleared after IPFS upload
+  imageUrl: text('image_url'), // Gateway URL for display
+
+  // IPFS hashes
+  writingIpfsHash: text('writing_ipfs_hash'),
+  imageIpfsHash: text('image_ipfs_hash'),
+  metadataIpfsHash: text('metadata_ipfs_hash'), // tokenUri
+
+  // NFT minting info
+  isMinted: boolean('is_minted').notNull().default(false),
+  mintTxHash: text('mint_tx_hash'),
+  tokenId: integer('token_id'),
+  mintedAt: timestamp('minted_at'),
+
+  // Full metadata for the NFT
+  nftMetadata: jsonb('nft_metadata'),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('ankys_session_idx').on(table.writingSessionId),
+  index('ankys_user_idx').on(table.userId),
+  index('ankys_minted_idx').on(table.isMinted),
+]);
+
+// Conversations - chat sessions with Anky
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id),
+  writingSessionId: uuid('writing_session_id').references(() => writingSessions.id),
+
+  messageCount: integer('message_count').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+
+  // Cap conversations at ~50 messages (configurable)
+  maxMessages: integer('max_messages').notNull().default(50),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('conversations_user_idx').on(table.userId),
+  index('conversations_session_idx').on(table.writingSessionId),
+  index('conversations_active_idx').on(table.isActive),
+]);
+
+// Conversation Messages
+export const conversationMessages = pgTable('conversation_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id),
+
+  role: text('role').notNull(), // 'user' | 'assistant'
+  content: text('content').notNull(),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('messages_conversation_idx').on(table.conversationId),
+]);
+
+// User Streaks - track consecutive days
+export const userStreaks = pgTable('user_streaks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id).unique(),
+
+  currentStreak: integer('current_streak').notNull().default(0),
+  longestStreak: integer('longest_streak').notNull().default(0),
+
+  // Last logical date they wrote an Anky
+  lastAnkyDate: timestamp('last_anky_date'),
+
+  // Total stats
+  totalAnkys: integer('total_ankys').notNull().default(0),
+  totalWritingSessions: integer('total_writing_sessions').notNull().default(0),
+  totalWordsWritten: integer('total_words_written').notNull().default(0),
+  totalTimeWrittenSeconds: integer('total_time_written_seconds').notNull().default(0),
+
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('streaks_user_idx').on(table.userId),
+]);
+
+// Relations
+export const usersRelations = relations(users, ({ many, one }) => ({
+  writingSessions: many(writingSessions),
+  ankys: many(ankys),
+  conversations: many(conversations),
+  streak: one(userStreaks),
+}));
+
+export const writingSessionsRelations = relations(writingSessions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [writingSessions.userId],
+    references: [users.id],
+  }),
+  anky: one(ankys),
+  conversations: many(conversations),
+}));
+
+export const ankysRelations = relations(ankys, ({ one }) => ({
+  writingSession: one(writingSessions, {
+    fields: [ankys.writingSessionId],
+    references: [writingSessions.id],
+  }),
+  user: one(users, {
+    fields: [ankys.userId],
+    references: [users.id],
+  }),
+}));
+
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  user: one(users, {
+    fields: [conversations.userId],
+    references: [users.id],
+  }),
+  writingSession: one(writingSessions, {
+    fields: [conversations.writingSessionId],
+    references: [writingSessions.id],
+  }),
+  messages: many(conversationMessages),
+}));
+
+export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [conversationMessages.conversationId],
+    references: [conversations.id],
+  }),
+}));
+
+export const userStreaksRelations = relations(userStreaks, ({ one }) => ({
+  user: one(users, {
+    fields: [userStreaks.userId],
+    references: [users.id],
+  }),
+}));
