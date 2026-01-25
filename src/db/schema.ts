@@ -115,6 +115,30 @@ export const conversationMessages = pgTable('conversation_messages', {
   index('messages_conversation_idx').on(table.conversationId),
 ]);
 
+// Generated Images - store all images generated via /image endpoint
+export const generatedImages = pgTable('generated_images', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // The prompt used to generate the image
+  prompt: text('prompt').notNull(),
+
+  // Image data
+  imageBase64: text('image_base64').notNull(),
+  imageUrl: text('image_url'), // data URI or external URL
+
+  // Optional: link to anky if this image was used for one
+  ankyId: uuid('anky_id').references(() => ankys.id),
+
+  // Generation metadata
+  model: text('model').default('gemini-2.5-flash-preview-05-20'),
+  generationTimeMs: integer('generation_time_ms'),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('generated_images_created_idx').on(table.createdAt),
+  index('generated_images_anky_idx').on(table.ankyId),
+]);
+
 // User Streaks - track consecutive days
 export const userStreaks = pgTable('user_streaks', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -188,5 +212,12 @@ export const userStreaksRelations = relations(userStreaks, ({ one }) => ({
   user: one(users, {
     fields: [userStreaks.userId],
     references: [users.id],
+  }),
+}));
+
+export const generatedImagesRelations = relations(generatedImages, ({ one }) => ({
+  anky: one(ankys, {
+    fields: [generatedImages.ankyId],
+    references: [ankys.id],
   }),
 }));

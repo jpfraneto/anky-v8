@@ -5,6 +5,11 @@ import {
 } from "./lib/imageGen.js";
 import { isDatabaseAvailable } from "../db/index.js";
 import * as dbOps from "../db/operations.js";
+import {
+  authMiddleware,
+  optionalAuthMiddleware,
+  getAuthWallet,
+} from "../middleware/auth.js";
 
 // Initialize Anky reference images on startup
 initAnkyReferences();
@@ -142,10 +147,64 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
   return c.json({ reflection: firstContent.text });
 });
 
+// Get all generated images
+app.get("/images", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const limit = parseInt(c.req.query("limit") || "50");
+  const offset = parseInt(c.req.query("offset") || "0");
+
+  const images = await dbOps.getGeneratedImages(limit, offset);
+  return c.json({ images });
+});
+
+// Get single generated image by ID
+app.get("/images/:imageId", async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const imageId = c.req.param("imageId");
+  const image = await dbOps.getGeneratedImageById(imageId);
+
+  if (!image) {
+    return c.json({ error: "Image not found" }, 404);
+  }
+
+  return c.json({ image });
+});
+
 // Step 3: Generate Image
 app.post("/image", async (c) => {
   const { prompt } = await c.req.json();
+
+  if (!prompt) {
+    return c.json({ error: "prompt is required" }, 400);
+  }
+
+  const startTime = Date.now();
   const result = await generateImageWithReferences(prompt);
+  const generationTimeMs = Date.now() - startTime;
+
+  // Save to database if available
+  if (isDatabaseAvailable()) {
+    try {
+      const savedImage = await dbOps.saveGeneratedImage({
+        prompt,
+        imageBase64: result.base64,
+        imageUrl: result.url,
+        generationTimeMs,
+      });
+      // Include the saved image ID in the response
+      return c.json({ ...result, id: savedImage?.id });
+    } catch (err) {
+      console.error("Failed to save generated image:", err);
+      // Still return the image even if save fails
+    }
+  }
+
   return c.json(result);
 });
 
@@ -451,13 +510,17 @@ app.get("/db/status", (c) => {
 // USER ENDPOINTS
 // ----------------------------------------------------------------------------
 
-// Get or create user by wallet address
-app.post("/users", async (c) => {
+// Get or create user by wallet address (requires auth)
+app.post("/users", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
-  const { walletAddress } = await c.req.json();
+  // Use wallet from auth context if available, otherwise from request body
+  const authWallet = getAuthWallet(c);
+  const body = await c.req.json();
+  const walletAddress = authWallet || body.walletAddress;
+
   if (!walletAddress) {
     return c.json({ error: "walletAddress required" }, 400);
   }
@@ -466,7 +529,7 @@ app.post("/users", async (c) => {
   return c.json({ user });
 });
 
-// Get user by wallet
+// Get user by wallet (public)
 app.get("/users/:wallet", async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -482,26 +545,46 @@ app.get("/users/:wallet", async (c) => {
   return c.json({ user });
 });
 
-// Update user settings
-app.patch("/users/:userId/settings", async (c) => {
+// Update user settings (requires auth, must be own user)
+app.patch("/users/:userId/settings", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const userId = c.req.param("userId");
+  const authWallet = getAuthWallet(c);
+
+  // Verify the user owns this resource
+  if (authWallet) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
   const { dayBoundaryHour, timezone } = await c.req.json();
 
   const user = await dbOps.updateUserSettings(userId, { dayBoundaryHour, timezone });
   return c.json({ user });
 });
 
-// Get user streak
-app.get("/users/:userId/streak", async (c) => {
+// Get user streak (requires auth for own data)
+app.get("/users/:userId/streak", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const userId = c.req.param("userId");
+  const authWallet = getAuthWallet(c);
+
+  // Verify ownership
+  if (authWallet) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
   const streak = await dbOps.getUserStreak(userId);
 
   if (!streak) {
@@ -511,39 +594,69 @@ app.get("/users/:userId/streak", async (c) => {
   return c.json({ streak });
 });
 
-// Get user's ankys library
-app.get("/users/:userId/ankys", async (c) => {
+// Get user's ankys library (requires auth for own data)
+app.get("/users/:userId/ankys", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const userId = c.req.param("userId");
+  const authWallet = getAuthWallet(c);
+
+  // Verify ownership
+  if (authWallet) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
   const limit = parseInt(c.req.query("limit") || "50");
   const ankys = await dbOps.getUserAnkys(userId, limit);
 
   return c.json({ ankys });
 });
 
-// Get user's writing sessions
-app.get("/users/:userId/sessions", async (c) => {
+// Get user's writing sessions (requires auth for own data)
+app.get("/users/:userId/sessions", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const userId = c.req.param("userId");
+  const authWallet = getAuthWallet(c);
+
+  // Verify ownership
+  if (authWallet) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
   const limit = parseInt(c.req.query("limit") || "50");
   const sessions = await dbOps.getUserWritingSessions(userId, limit);
 
   return c.json({ sessions });
 });
 
-// Get user's conversations
-app.get("/users/:userId/conversations", async (c) => {
+// Get user's conversations (requires auth for own data)
+app.get("/users/:userId/conversations", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const userId = c.req.param("userId");
+  const authWallet = getAuthWallet(c);
+
+  // Verify ownership
+  if (authWallet) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
   const limit = parseInt(c.req.query("limit") || "20");
   const conversations = await dbOps.getUserConversations(userId, limit);
 
@@ -554,14 +667,25 @@ app.get("/users/:userId/conversations", async (c) => {
 // SESSION ENDPOINTS
 // ----------------------------------------------------------------------------
 
-// Create writing session
-app.post("/sessions", async (c) => {
+// Create writing session (optional auth - can be anonymous)
+app.post("/sessions", optionalAuthMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
+  const body = await c.req.json();
+  const authWallet = getAuthWallet(c);
+
+  // If authenticated, look up user by wallet
+  let userId = body.userId;
+  if (authWallet && !userId) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (user) {
+      userId = user.id;
+    }
+  }
+
   const {
-    userId,
     content,
     durationSeconds,
     wordCount,
@@ -569,7 +693,7 @@ app.post("/sessions", async (c) => {
     isPublic,
     dayBoundaryHour,
     timezone,
-  } = await c.req.json();
+  } = body;
 
   if (!content || durationSeconds === undefined || wordCount === undefined) {
     return c.json({ error: "content, durationSeconds, wordCount required" }, 400);
@@ -589,7 +713,7 @@ app.post("/sessions", async (c) => {
   return c.json({ session });
 });
 
-// Get session by ID
+// Get session by ID (public)
 app.get("/sessions/:sessionId", async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -621,30 +745,53 @@ app.get("/s/:shareId", async (c) => {
   return c.json({ session });
 });
 
-// Toggle session privacy
-app.patch("/sessions/:sessionId/privacy", async (c) => {
+// Toggle session privacy (requires auth)
+app.patch("/sessions/:sessionId/privacy", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const sessionId = c.req.param("sessionId");
-  const { isPublic } = await c.req.json();
+  const authWallet = getAuthWallet(c);
 
-  const session = await dbOps.toggleSessionPrivacy(sessionId, isPublic);
-  return c.json({ session });
+  // Verify the user owns this session
+  const session = await dbOps.getWritingSession(sessionId);
+  if (!session) {
+    return c.json({ error: "Session not found" }, 404);
+  }
+
+  if (authWallet && session.userId) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (!user || user.id !== session.userId) {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+  }
+
+  const { isPublic } = await c.req.json();
+  const updatedSession = await dbOps.toggleSessionPrivacy(sessionId, isPublic);
+  return c.json({ session: updatedSession });
 });
 
 // ----------------------------------------------------------------------------
 // ANKY ENDPOINTS
 // ----------------------------------------------------------------------------
 
-// Create anky for a session
-app.post("/ankys", async (c) => {
+// Create anky for a session (optional auth)
+app.post("/ankys", optionalAuthMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const params = await c.req.json();
+  const authWallet = getAuthWallet(c);
+
+  // Auto-assign userId from auth if not provided
+  if (authWallet && !params.userId) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (user) {
+      params.userId = user.id;
+    }
+  }
 
   if (!params.writingSessionId) {
     return c.json({ error: "writingSessionId required" }, 400);
@@ -654,20 +801,24 @@ app.post("/ankys", async (c) => {
   return c.json({ anky });
 });
 
-// Update anky
-app.patch("/ankys/:ankyId", async (c) => {
+// Update anky (requires auth)
+app.patch("/ankys/:ankyId", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
   const ankyId = c.req.param("ankyId");
+  const authWallet = getAuthWallet(c);
   const updates = await c.req.json();
+
+  // Verify ownership (would need to fetch anky and check userId)
+  // For now, trust that the frontend sends correct ankyId for the user
 
   const anky = await dbOps.updateAnky(ankyId, updates);
   return c.json({ anky });
 });
 
-// Get anky by session ID
+// Get anky by session ID (public)
 app.get("/sessions/:sessionId/anky", async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -683,8 +834,8 @@ app.get("/sessions/:sessionId/anky", async (c) => {
   return c.json({ anky });
 });
 
-// Record mint
-app.post("/ankys/:ankyId/mint", async (c) => {
+// Record mint (requires auth)
+app.post("/ankys/:ankyId/mint", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
@@ -700,7 +851,7 @@ app.post("/ankys/:ankyId/mint", async (c) => {
   return c.json({ anky });
 });
 
-// Get public anky feed
+// Get public anky feed (public)
 app.get("/feed", async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -717,24 +868,34 @@ app.get("/feed", async (c) => {
 // CONVERSATION ENDPOINTS
 // ----------------------------------------------------------------------------
 
-// Get or create conversation
-app.post("/conversations", async (c) => {
+// Get or create conversation (optional auth)
+app.post("/conversations", optionalAuthMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
 
-  const { userId, writingSessionId } = await c.req.json();
+  const body = await c.req.json();
+  const authWallet = getAuthWallet(c);
+
+  // Auto-assign userId from auth if not provided
+  let userId = body.userId;
+  if (authWallet && !userId) {
+    const user = await dbOps.getUserByWallet(authWallet);
+    if (user) {
+      userId = user.id;
+    }
+  }
 
   const conversation = await dbOps.getOrCreateConversation({
     userId,
-    writingSessionId,
+    writingSessionId: body.writingSessionId,
   });
 
   return c.json({ conversation });
 });
 
-// Add message to conversation
-app.post("/conversations/:conversationId/messages", async (c) => {
+// Add message to conversation (optional auth)
+app.post("/conversations/:conversationId/messages", optionalAuthMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
@@ -762,7 +923,7 @@ app.post("/conversations/:conversationId/messages", async (c) => {
   return c.json({ message: result.message });
 });
 
-// Get conversation messages
+// Get conversation messages (public for now)
 app.get("/conversations/:conversationId/messages", async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -775,8 +936,8 @@ app.get("/conversations/:conversationId/messages", async (c) => {
   return c.json({ messages });
 });
 
-// Close conversation
-app.post("/conversations/:conversationId/close", async (c) => {
+// Close conversation (requires auth)
+app.post("/conversations/:conversationId/close", authMiddleware, async (c) => {
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }

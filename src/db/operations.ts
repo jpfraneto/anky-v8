@@ -1,5 +1,5 @@
 import { eq, desc, and, sql } from 'drizzle-orm';
-import { db, users, writingSessions, ankys, conversations, conversationMessages, userStreaks } from './index';
+import { db, users, writingSessions, ankys, conversations, conversationMessages, userStreaks, generatedImages } from './index';
 import { getLogicalDate, areConsecutiveDays, isSameDay, daysSince, generateShareId } from './streak-utils';
 
 // ============================================================================
@@ -485,6 +485,59 @@ export async function getUserStreak(userId: string) {
     streakIsActive,
     daysSinceLastAnky: days,
   };
+}
+
+// ============================================================================
+// GENERATED IMAGES OPERATIONS
+// ============================================================================
+
+export async function saveGeneratedImage(params: {
+  prompt: string;
+  imageBase64: string;
+  imageUrl?: string;
+  model?: string;
+  generationTimeMs?: number;
+}) {
+  if (!db) return null;
+
+  const [image] = await db.insert(generatedImages).values({
+    prompt: params.prompt,
+    imageBase64: params.imageBase64,
+    imageUrl: params.imageUrl,
+    model: params.model || 'gemini-2.5-flash-preview-05-20',
+    generationTimeMs: params.generationTimeMs,
+  }).returning();
+
+  return image;
+}
+
+export async function getGeneratedImages(limit = 50, offset = 0) {
+  if (!db) return [];
+
+  return db.query.generatedImages.findMany({
+    orderBy: [desc(generatedImages.createdAt)],
+    limit,
+    offset,
+  });
+}
+
+export async function getGeneratedImageById(id: string) {
+  if (!db) return null;
+
+  return db.query.generatedImages.findFirst({
+    where: eq(generatedImages.id, id),
+  });
+}
+
+export async function linkImageToAnky(imageId: string, ankyId: string) {
+  if (!db) return null;
+
+  const [updated] = await db.update(generatedImages)
+    .set({ ankyId })
+    .where(eq(generatedImages.id, imageId))
+    .returning();
+
+  return updated;
 }
 
 // ============================================================================
