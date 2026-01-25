@@ -11,16 +11,17 @@ app.use(
   "/api/*",
   cors({
     origin: [
-      "http://localhost:5173", // Vite default
+      "http://localhost:5173",
       "http://localhost:3000",
-      "http://localhost:4173", // Vite preview
+      "http://localhost:4173",
       "https://miniapp.anky.app",
       "https://anky.app",
       "https://www.anky.app",
+      "https://anky-v8.orbiter.website",
       process.env.FRONTEND_URL || "",
     ].filter(Boolean),
     credentials: true,
-  })
+  }),
 );
 
 // Serve static files from public directory
