@@ -10,6 +10,7 @@ import {
   optionalAuthMiddleware,
   getAuthWallet,
 } from "../middleware/auth.js";
+import { getLogicalDate, isSameDay } from "../db/streak-utils.js";
 
 // Initialize Anky reference images on startup
 initAnkyReferences();
@@ -520,6 +521,102 @@ app.get("/db/status", (c) => {
 // ----------------------------------------------------------------------------
 // USER ENDPOINTS
 // ----------------------------------------------------------------------------
+
+// Get everything about the logged-in user (profile, streak, stats, recent sessions)
+app.get("/api/me", authMiddleware, async (c) => {
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const authWallet = getAuthWallet(c);
+  if (!authWallet) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  // 1. Get user by wallet
+  const user = await dbOps.getUserByWallet(authWallet);
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  // 2. Get user's sessions (includes ankys via relation)
+  const sessions = await dbOps.getUserWritingSessions(user.id, 100);
+
+  // 3. Get streak data
+  const streakData = await dbOps.getUserStreak(user.id);
+
+  // 4. Calculate hasWrittenToday
+  const currentLogicalDate = getLogicalDate(
+    new Date(),
+    user.dayBoundaryHour,
+    user.timezone
+  );
+  const hasWrittenToday = streakData?.lastAnkyDate
+    ? isSameDay(streakData.lastAnkyDate, currentLogicalDate)
+    : false;
+
+  // 5. Calculate stats from streak record (or compute if missing)
+  const totalAnkys = streakData?.totalAnkys ?? 0;
+  const totalSessions = streakData?.totalWritingSessions ?? 0;
+  const totalWords = streakData?.totalWordsWritten ?? 0;
+  const totalTimeSeconds = streakData?.totalTimeWrittenSeconds ?? 0;
+  const averageWpm =
+    totalTimeSeconds > 0 ? Math.round((totalWords / totalTimeSeconds) * 60) : 0;
+  const averageSessionSeconds =
+    totalSessions > 0 ? Math.round(totalTimeSeconds / totalSessions) : 0;
+
+  // 6. Format recent sessions (last 20)
+  const recentSessions = sessions.slice(0, 20).map((s) => ({
+    id: s.id,
+    shareId: s.shareId,
+    content: s.content?.substring(0, 200) || "",
+    fullContent: s.content || "",
+    durationSeconds: s.durationSeconds,
+    wordCount: s.wordCount,
+    wpm: s.wordsPerMinute || 0,
+    isAnky: s.isAnky,
+    createdAt: s.createdAt,
+    anky: s.anky
+      ? {
+          id: s.anky.id,
+          title: s.anky.title,
+          imageUrl: s.anky.imageUrl,
+          reflection: s.anky.reflection,
+        }
+      : null,
+  }));
+
+  // Calculate isActive: streak is active if user wrote today or yesterday
+  const isActive =
+    streakData && "daysSinceLastAnky" in streakData
+      ? (streakData as { daysSinceLastAnky: number }).daysSinceLastAnky <= 1
+      : false;
+
+  return c.json({
+    user: {
+      id: user.id,
+      walletAddress: user.walletAddress,
+      dayBoundaryHour: user.dayBoundaryHour,
+      timezone: user.timezone,
+      createdAt: user.createdAt,
+    },
+    streak: {
+      current: streakData?.currentStreak ?? 0,
+      longest: streakData?.longestStreak ?? 0,
+      isActive,
+      hasWrittenToday,
+    },
+    stats: {
+      totalAnkys,
+      totalSessions,
+      totalWords,
+      totalTimeSeconds,
+      averageWpm,
+      averageSessionSeconds,
+    },
+    recentSessions,
+  });
+});
 
 // Get or create user by wallet address (requires auth)
 app.post("/users", authMiddleware, async (c) => {
