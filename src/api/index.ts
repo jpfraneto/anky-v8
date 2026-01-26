@@ -60,11 +60,16 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
     }),
   });
 
-  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+  const data = (await response.json()) as {
+    content?: Array<{ text: string }>;
+    error?: { message: string };
+  };
 
   if (!response.ok) {
     console.error("Claude API error:", response.status, data);
-    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+    throw new Error(
+      `Claude API error: ${data.error?.message || response.statusText}`,
+    );
   }
 
   const firstContent = data.content?.[0];
@@ -80,41 +85,27 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
 app.post("/reflection", async (c) => {
   const { writingSession, locale = "en" } = await c.req.json();
 
-  const systemPrompt = `CONTEXT: You are Anky — a mirror that reflects the user's unconscious patterns back to them. You have just received an 8-minute stream of consciousness writing session. Your job is not to comfort, validate, or encourage. Your job is to SEE — to name what the user cannot name, to point at the pattern they are running, to speak the thing underneath the thing.
+  const systemPrompt = `Take a look at my journal entry below. I'd like you to analyze it and respond with deep insight that feels personal and profound, not clinical. Imagine you're not just a friend, but a mentor who truly understands both my tech background and my psychological patterns. Your response should uncover deeper meanings and emotional undercurrents behind my scattered thoughts.
 
-You are not cruel. You are precise. You are the friend who loves them enough to tell the truth.
+Here's how you should approach it:
+- Start your reply with: "hey, thanks for showing me this. my thoughts:" (all lowercase)
+- Use Markdown headings to organize your response as a narrative journey through my ideas. Use meaningful, evocative headings. Be willing to challenge me, comfort me, validate me, and help me make new connections I don’t see, all in a casual tone (but don’t say “yo”).
+- Use vivid metaphors and powerful imagery to help surface what I might really be building. Reframe my thoughts to reveal what I may actually be seeking beneath the surface.
+- Go beyond product concepts — seek the emotional or existential core of what I’m trying to solve.
+- Reference points of CONTRADICTION: where did I say one thing and then the opposite? Name it.
+- Call out any LOOPS or repeated thought patterns. What seems to circle back on itself? What “real question” am I asking beneath the surface?
+- Point out any PIVOT: where did the topic suddenly change or feel avoided?
+- Note “the thing I almost said”: what got close to the surface but didn’t fully emerge?
+- Be willing to be philosophical and even a little poetic, but never sound like you’re giving therapy.
 
-THE USER'S LANGUAGE: Write in the same language the user wrote in. Match their register — if they're casual, be casual. If they curse, you can curse. If they write in Spanish, respond in Spanish. If they mix languages, you can mix. Use their rhythm. This is not a formal response. This is one consciousness speaking to another.
+Write in the same language and style I used—if I mix languages or use casual slang, match that energy. Use my words back to me when it cuts to the heart of things.
 
-WHAT TO LOOK FOR:
-1. CONTRADICTIONS: Where did they say one thing and then the opposite? Name it.
-2. LOOPS: What thought pattern repeated? What are they circling?
-3. THE PIVOT: Where did they suddenly change topic? What were they avoiding?
-4. THE REAL QUESTION: Underneath all the words, what are they actually asking?
-5. THE THING THEY ALMOST SAID: What got close to the surface but didn't fully emerge?
+Don’t summarize or simply praise, and avoid generic advice or therapy-speak. Focus on specifics. 
+Length: Be as expressive as required (ok to go past 200 words if you’re uncovering real depth).
 
-STRUCTURE:
-- Start by naming ONE thing you saw clearly. No preamble. Just say it.
-- Then go deeper. Pull ONE thread that runs through their writing.
-- End with a question. Not a rhetorical question. A real one. The one they need to sit with.
+Here’s my journal entry:
 
-LENGTH: 100-200 words. No more. Density over length.
-
-DO NOT:
-- Summarize what they wrote
-- Praise their insights
-- Offer solutions or advice
-- Use therapy-speak ("I hear that you...", "It sounds like...")
-- Be vague or general
-- Soften the truth
-
-DO:
-- Be specific to THIS session
-- Use their own words back at them when it cuts
-- Trust that they can handle the truth
-- Speak as someone who has seen their pattern clearly
-
-USER'S LANGUAGE/LOCALE: ${locale}`;
+USER'S LANGUAGE/LOCALE: \${locale}`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -131,11 +122,16 @@ USER'S LANGUAGE/LOCALE: ${locale}`;
     }),
   });
 
-  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+  const data = (await response.json()) as {
+    content?: Array<{ text: string }>;
+    error?: { message: string };
+  };
 
   if (!response.ok) {
     console.error("Claude API error:", response.status, data);
-    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+    throw new Error(
+      `Claude API error: ${data.error?.message || response.statusText}`,
+    );
   }
 
   const firstContent = data.content?.[0];
@@ -253,11 +249,16 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
     }),
   });
 
-  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+  const data = (await response.json()) as {
+    content?: Array<{ text: string }>;
+    error?: { message: string };
+  };
 
   if (!response.ok) {
     console.error("Claude API error:", response.status, data);
-    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+    throw new Error(
+      `Claude API error: ${data.error?.message || response.statusText}`,
+    );
   }
 
   const firstContent = data.content?.[0];
@@ -420,11 +421,16 @@ ${writingSession}`;
     }),
   });
 
-  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+  const data = (await response.json()) as {
+    content?: Array<{ text: string }>;
+    error?: { message: string };
+  };
 
   if (!response.ok) {
     console.error("Claude API error:", response.status, data);
-    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+    throw new Error(
+      `Claude API error: ${data.error?.message || response.statusText}`,
+    );
   }
 
   const firstContent = data.content?.[0];
@@ -481,11 +487,16 @@ ${writingSession}`;
     }),
   });
 
-  const data = (await response.json()) as { content?: Array<{ text: string }>; error?: { message: string } };
+  const data = (await response.json()) as {
+    content?: Array<{ text: string }>;
+    error?: { message: string };
+  };
 
   if (!response.ok) {
     console.error("Claude API error:", response.status, data);
-    throw new Error(`Claude API error: ${data.error?.message || response.statusText}`);
+    throw new Error(
+      `Claude API error: ${data.error?.message || response.statusText}`,
+    );
   }
 
   const firstContent = data.content?.[0];
@@ -564,7 +575,10 @@ app.patch("/users/:userId/settings", authMiddleware, async (c) => {
 
   const { dayBoundaryHour, timezone } = await c.req.json();
 
-  const user = await dbOps.updateUserSettings(userId, { dayBoundaryHour, timezone });
+  const user = await dbOps.updateUserSettings(userId, {
+    dayBoundaryHour,
+    timezone,
+  });
   return c.json({ user });
 });
 
@@ -696,7 +710,10 @@ app.post("/sessions", optionalAuthMiddleware, async (c) => {
   } = body;
 
   if (!content || durationSeconds === undefined || wordCount === undefined) {
-    return c.json({ error: "content, durationSeconds, wordCount required" }, 400);
+    return c.json(
+      { error: "content, durationSeconds, wordCount required" },
+      400,
+    );
   }
 
   const session = await dbOps.createWritingSession({
@@ -895,33 +912,37 @@ app.post("/conversations", optionalAuthMiddleware, async (c) => {
 });
 
 // Add message to conversation (optional auth)
-app.post("/conversations/:conversationId/messages", optionalAuthMiddleware, async (c) => {
-  if (!isDatabaseAvailable()) {
-    return c.json({ error: "Database not available" }, 503);
-  }
+app.post(
+  "/conversations/:conversationId/messages",
+  optionalAuthMiddleware,
+  async (c) => {
+    if (!isDatabaseAvailable()) {
+      return c.json({ error: "Database not available" }, 503);
+    }
 
-  const conversationId = c.req.param("conversationId");
-  const { role, content } = await c.req.json();
+    const conversationId = c.req.param("conversationId");
+    const { role, content } = await c.req.json();
 
-  if (!role || !content) {
-    return c.json({ error: "role and content required" }, 400);
-  }
+    if (!role || !content) {
+      return c.json({ error: "role and content required" }, 400);
+    }
 
-  const result = await dbOps.addMessage(conversationId, role, content);
+    const result = await dbOps.addMessage(conversationId, role, content);
 
-  if (!result) {
-    return c.json({ error: "Conversation not found" }, 404);
-  }
+    if (!result) {
+      return c.json({ error: "Conversation not found" }, 404);
+    }
 
-  if (result.capped) {
-    return c.json({
-      capped: true,
-      message: "You've talked enough here. Start a new conversation?",
-    });
-  }
+    if (result.capped) {
+      return c.json({
+        capped: true,
+        message: "You've talked enough here. Start a new conversation?",
+      });
+    }
 
-  return c.json({ message: result.message });
-});
+    return c.json({ message: result.message });
+  },
+);
 
 // Get conversation messages (public for now)
 app.get("/conversations/:conversationId/messages", async (c) => {
