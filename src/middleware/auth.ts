@@ -1,6 +1,9 @@
 import { createMiddleware } from "hono/factory";
 import { PrivyClient } from "@privy-io/server-auth";
 import type { Context, Next } from "hono";
+import { Logger } from "../lib/logger";
+
+const logger = Logger("Auth");
 
 // Initialize Privy client
 const privyAppId = process.env.PRIVY_APP_ID;
@@ -10,9 +13,9 @@ let privyClient: PrivyClient | null = null;
 
 if (privyAppId && privyAppSecret) {
   privyClient = new PrivyClient(privyAppId, privyAppSecret);
-  console.log("Privy authentication initialized");
+  logger.info("Privy authentication initialized");
 } else {
-  console.warn("⚠️  PRIVY_APP_ID or PRIVY_APP_SECRET not set - auth middleware disabled");
+  logger.warn("PRIVY_APP_ID or PRIVY_APP_SECRET not set - auth middleware disabled");
 }
 
 // Type for authenticated context
@@ -39,7 +42,7 @@ declare module "hono" {
 export const authMiddleware = createMiddleware(async (c: Context, next: Next) => {
   // Skip auth if Privy is not configured (for development)
   if (!privyClient) {
-    console.warn("Auth skipped - Privy not configured");
+    logger.debug("Auth skipped - Privy not configured");
     // Set a placeholder auth context for development
     c.set("auth", {
       userId: "dev-user",
@@ -51,6 +54,7 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
   const authHeader = c.req.header("Authorization");
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    logger.debug("Missing or invalid Authorization header");
     return c.json({ error: "Missing or invalid Authorization header" }, 401);
   }
 
@@ -76,7 +80,7 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
       }
     } catch (userError) {
       // User fetch failed, continue without wallet address
-      console.warn("Could not fetch user details:", userError);
+      logger.warn("Could not fetch user details", userError);
     }
 
     // Set auth context
@@ -85,9 +89,10 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
       walletAddress,
     });
 
+    logger.debug(`Authenticated user: ${verifiedClaims.userId.slice(0, 20)}...`);
     return next();
   } catch (error) {
-    console.error("Auth token verification failed:", error);
+    logger.error("Auth token verification failed", error);
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 });
@@ -136,8 +141,11 @@ export const optionalAuthMiddleware = createMiddleware(async (c: Context, next: 
       userId: verifiedClaims.userId,
       walletAddress,
     });
+
+    logger.debug(`Optional auth: user ${verifiedClaims.userId.slice(0, 20)}...`);
   } catch {
     // Token invalid, continue without auth (don't fail)
+    logger.debug("Optional auth: invalid token, continuing without auth");
   }
 
   return next();

@@ -11,11 +11,36 @@ import {
   getAuthWallet,
 } from "../middleware/auth.js";
 import { getLogicalDate, isSameDay } from "../db/streak-utils.js";
+import { Logger } from "../lib/logger.js";
+
+const logger = Logger("API");
 
 // Initialize Anky reference images on startup
 initAnkyReferences();
+logger.info("Anky reference images initialized");
 
 const app = new Hono();
+
+// Request logging middleware
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  const method = c.req.method;
+  const path = c.req.path;
+
+  await next();
+
+  const duration = Date.now() - start;
+  const status = c.res.status;
+
+  // Color code by status
+  if (status >= 500) {
+    logger.error(`${method} ${path} ${status} ${duration}ms`);
+  } else if (status >= 400) {
+    logger.warn(`${method} ${path} ${status} ${duration}ms`);
+  } else {
+    logger.info(`${method} ${path} ${status} ${duration}ms`);
+  }
+});
 
 // Health check
 app.get("/", (c) => c.json({ status: "ok" }));
@@ -25,6 +50,7 @@ app.get("/feed-html", (c) => c.html(""));
 
 // Step 1: Generate Image Prompt
 app.post("/prompt", async (c) => {
+  logger.info("Generating image prompt from writing session");
   const { writingSession } = await c.req.json();
 
   const systemPrompt = `CONTEXT: You are generating an image prompt for Anky based on a user's 8-minute stream of consciousness writing session. Anky is a blue-skinned creature with purple swirling hair, golden/amber eyes, golden decorative accents and jewelry, large expressive ears, and an ancient-yet-childlike quality. Anky exists in mystical, richly colored environments (deep blues, purples, oranges, golds). The aesthetic is spiritual but not sterile — warm, alive, slightly psychedelic.
@@ -67,7 +93,7 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
   };
 
   if (!response.ok) {
-    console.error("Claude API error:", response.status, data);
+    logger.error("Claude API error for prompt generation", { status: response.status, error: data.error?.message });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -75,15 +101,17 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
 
   const firstContent = data.content?.[0];
   if (!firstContent) {
-    console.error("Unexpected Claude response:", data);
+    logger.error("Unexpected Claude response for prompt", data);
     throw new Error("Invalid response from Claude API");
   }
 
+  logger.info("Image prompt generated successfully");
   return c.json({ prompt: firstContent.text });
 });
 
 // Step 2: Generate Reflection
 app.post("/reflection", async (c) => {
+  logger.info("Generating reflection from writing session");
   const { writingSession, locale = "en" } = await c.req.json();
 
   const systemPrompt = `Take a look at my journal entry below. I'd like you to analyze it and respond with deep insight that feels personal and profound, not clinical. Imagine you're not just a friend, but a mentor who truly understands both my tech background and my psychological patterns. Your response should uncover deeper meanings and emotional undercurrents behind my scattered thoughts.
@@ -129,7 +157,7 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
   };
 
   if (!response.ok) {
-    console.error("Claude API error:", response.status, data);
+    logger.error("Claude API error for reflection", { status: response.status, error: data.error?.message });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -137,10 +165,11 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
 
   const firstContent = data.content?.[0];
   if (!firstContent) {
-    console.error("Unexpected Claude response:", data);
+    logger.error("Unexpected Claude response for reflection", data);
     throw new Error("Invalid response from Claude API");
   }
 
+  logger.info("Reflection generated successfully");
   return c.json({ reflection: firstContent.text });
 });
 
@@ -175,15 +204,19 @@ app.get("/images/:imageId", async (c) => {
 
 // Step 3: Generate Image
 app.post("/image", async (c) => {
+  logger.info("Generating Anky image");
   const { prompt } = await c.req.json();
 
   if (!prompt) {
+    logger.warn("Image generation failed: no prompt provided");
     return c.json({ error: "prompt is required" }, 400);
   }
 
   const startTime = Date.now();
   const result = await generateImageWithReferences(prompt);
   const generationTimeMs = Date.now() - startTime;
+
+  logger.info(`Image generated in ${generationTimeMs}ms`);
 
   // Save to database if available
   if (isDatabaseAvailable()) {
@@ -194,10 +227,11 @@ app.post("/image", async (c) => {
         imageUrl: result.url,
         generationTimeMs,
       });
+      logger.debug(`Image saved to database: ${savedImage?.id}`);
       // Include the saved image ID in the response
       return c.json({ ...result, id: savedImage?.id });
     } catch (err) {
-      console.error("Failed to save generated image:", err);
+      logger.error("Failed to save generated image to database", err);
       // Still return the image even if save fails
     }
   }
@@ -207,6 +241,7 @@ app.post("/image", async (c) => {
 
 // Step 4: Generate Title
 app.post("/title", async (c) => {
+  logger.info("Generating title for Anky");
   const { writingSession, imagePrompt, reflection } = await c.req.json();
 
   const systemPrompt = `CONTEXT: You are naming an Anky — a visual representation of a user's 8-minute stream of consciousness writing session. The title is not a summary. It is a MIRROR. It should capture the emotional truth, the core tension, or the unconscious thread running through the writing.
@@ -256,7 +291,7 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
   };
 
   if (!response.ok) {
-    console.error("Claude API error:", response.status, data);
+    logger.error("Claude API error for title", { status: response.status, error: data.error?.message });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -264,21 +299,24 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
 
   const firstContent = data.content?.[0];
   if (!firstContent) {
-    console.error("Unexpected Claude response:", data);
+    logger.error("Unexpected Claude response for title", data);
     throw new Error("Invalid response from Claude API");
   }
 
   const rawTitle = firstContent.text.trim().toLowerCase().replace(/['"]/g, "");
+  logger.info(`Title generated: "${rawTitle}"`);
   return c.json({ title: rawTitle });
 });
 
 // Step 5: IPFS Upload
 app.post("/ipfs", async (c) => {
+  logger.info("Uploading Anky assets to IPFS");
   const { writingSession, imageBase64, title, reflection, imagePrompt } =
     await c.req.json();
 
   const pinataJwt = process.env.PINATA_JWT;
   if (!pinataJwt) {
+    logger.error("IPFS upload failed: Pinata JWT not configured");
     return c.json({ error: "IPFS not configured" }, 400);
   }
 
@@ -349,6 +387,7 @@ app.post("/ipfs", async (c) => {
   const metadataData = (await metadataResponse.json()) as { IpfsHash: string };
   const tokenUri = metadataData.IpfsHash;
 
+  logger.info(`IPFS upload complete: writing=${writingSessionIpfs}, image=${imageIpfs}, metadata=${tokenUri}`);
   return c.json({ writingSessionIpfs, imageIpfs, tokenUri });
 });
 
@@ -524,6 +563,7 @@ app.get("/db/status", (c) => {
 
 // Get everything about the logged-in user (profile, streak, stats, recent sessions)
 app.get("/api/me", authMiddleware, async (c) => {
+  logger.debug("Fetching current user profile");
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
@@ -536,6 +576,7 @@ app.get("/api/me", authMiddleware, async (c) => {
   // 1. Get user by wallet
   const user = await dbOps.getUserByWallet(authWallet);
   if (!user) {
+    logger.warn(`User not found for wallet: ${authWallet.slice(0, 10)}...`);
     return c.json({ error: "User not found" }, 404);
   }
 
@@ -620,6 +661,7 @@ app.get("/api/me", authMiddleware, async (c) => {
 
 // Get or create user by wallet address (requires auth)
 app.post("/users", authMiddleware, async (c) => {
+  logger.info("Creating or retrieving user");
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
@@ -630,10 +672,12 @@ app.post("/users", authMiddleware, async (c) => {
   const walletAddress = authWallet || body.walletAddress;
 
   if (!walletAddress) {
+    logger.warn("User creation failed: no wallet address");
     return c.json({ error: "walletAddress required" }, 400);
   }
 
   const user = await dbOps.getOrCreateUser(walletAddress);
+  logger.info(`User retrieved/created: ${user?.id}`);
   return c.json({ user });
 });
 
@@ -780,7 +824,9 @@ app.get("/users/:userId/conversations", authMiddleware, async (c) => {
 
 // Create writing session (optional auth - can be anonymous)
 app.post("/sessions", optionalAuthMiddleware, async (c) => {
+  logger.info("Creating new writing session");
   if (!isDatabaseAvailable()) {
+    logger.error("Session creation failed: database not available");
     return c.json({ error: "Database not available" }, 503);
   }
 
@@ -807,6 +853,7 @@ app.post("/sessions", optionalAuthMiddleware, async (c) => {
   } = body;
 
   if (!content || durationSeconds === undefined || wordCount === undefined) {
+    logger.warn("Session creation failed: missing required fields");
     return c.json(
       { error: "content, durationSeconds, wordCount required" },
       400,
@@ -824,6 +871,8 @@ app.post("/sessions", optionalAuthMiddleware, async (c) => {
     timezone,
   });
 
+  const isAnky = durationSeconds >= 480;
+  logger.info(`Writing session created: ${session?.id} (${wordCount} words, ${Math.floor(durationSeconds / 60)}min, isAnky=${isAnky})`);
   return c.json({ session });
 });
 
@@ -892,7 +941,9 @@ app.patch("/sessions/:sessionId/privacy", authMiddleware, async (c) => {
 
 // Create anky for a session (optional auth)
 app.post("/ankys", optionalAuthMiddleware, async (c) => {
+  logger.info("Creating new Anky");
   if (!isDatabaseAvailable()) {
+    logger.error("Anky creation failed: database not available");
     return c.json({ error: "Database not available" }, 503);
   }
 
@@ -908,11 +959,53 @@ app.post("/ankys", optionalAuthMiddleware, async (c) => {
   }
 
   if (!params.writingSessionId) {
+    logger.warn("Anky creation failed: missing writingSessionId");
     return c.json({ error: "writingSessionId required" }, 400);
   }
 
   const anky = await dbOps.createAnky(params);
+  logger.info(`Anky created: ${anky?.id} for session ${params.writingSessionId}`);
   return c.json({ anky });
+});
+
+// Get all ankys for public gallery (public)
+app.get("/ankys", async (c) => {
+  logger.debug("Fetching ankys for gallery");
+  if (!isDatabaseAvailable()) {
+    return c.json({ error: "Database not available" }, 503);
+  }
+
+  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
+  const offset = parseInt(c.req.query("offset") || "0");
+
+  const { ankys, total } = await dbOps.getAnkysForGallery(limit, offset);
+  logger.debug(`Gallery query: ${ankys.length} ankys returned (total: ${total})`)
+
+  // Transform response: truncate reflection and format session data
+  const formattedAnkys = ankys.map((anky) => ({
+    id: anky.id,
+    title: anky.title,
+    imageUrl: anky.imageUrl,
+    reflection: anky.reflection
+      ? anky.reflection.length > 200
+        ? anky.reflection.slice(0, 200) + "..."
+        : anky.reflection
+      : null,
+    createdAt: anky.createdAt,
+    session: anky.writingSession
+      ? {
+          shareId: anky.writingSession.shareId,
+          wordCount: anky.writingSession.wordCount,
+          durationSeconds: anky.writingSession.durationSeconds,
+        }
+      : null,
+  }));
+
+  return c.json({
+    ankys: formattedAnkys,
+    total,
+    hasMore: offset + ankys.length < total,
+  });
 });
 
 // Update anky (requires auth)
@@ -950,6 +1043,7 @@ app.get("/sessions/:sessionId/anky", async (c) => {
 
 // Record mint (requires auth)
 app.post("/ankys/:ankyId/mint", authMiddleware, async (c) => {
+  logger.info("Recording NFT mint");
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
   }
@@ -958,10 +1052,12 @@ app.post("/ankys/:ankyId/mint", authMiddleware, async (c) => {
   const { txHash, tokenId } = await c.req.json();
 
   if (!txHash || tokenId === undefined) {
+    logger.warn("Mint recording failed: missing txHash or tokenId");
     return c.json({ error: "txHash and tokenId required" }, 400);
   }
 
   const anky = await dbOps.recordMint(ankyId, txHash, tokenId);
+  logger.info(`NFT minted: anky=${ankyId}, tokenId=${tokenId}, tx=${txHash.slice(0, 10)}...`);
   return c.json({ anky });
 });
 

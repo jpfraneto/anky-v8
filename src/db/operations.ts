@@ -254,6 +254,37 @@ export async function getPublicAnkyFeed(limit = 50, offset = 0) {
   });
 }
 
+export async function getAnkysForGallery(limit = 50, offset = 0) {
+  if (!db) return { ankys: [], total: 0 };
+
+  // Get ankys with imageUrl (for gallery display)
+  const results = await db.query.ankys.findMany({
+    where: sql`${ankys.imageUrl} IS NOT NULL`,
+    orderBy: [desc(ankys.createdAt)],
+    limit,
+    offset,
+    with: {
+      writingSession: {
+        columns: {
+          shareId: true,
+          wordCount: true,
+          durationSeconds: true,
+        },
+      },
+    },
+  });
+
+  // Get total count for pagination
+  const countResult = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(ankys)
+    .where(sql`${ankys.imageUrl} IS NOT NULL`);
+
+  const total = countResult[0]?.count ?? 0;
+
+  return { ankys: results, total };
+}
+
 export async function recordMint(ankyId: string, txHash: string, tokenId: number) {
   if (!db) return null;
 

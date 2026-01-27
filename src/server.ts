@@ -3,6 +3,11 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import apiRoutes from "./api/index.js";
+import { getConfig, printStartupBanner } from "./config";
+import { Logger } from "./lib/logger";
+
+const logger = Logger("Server");
+const config = getConfig();
 
 const app = new Hono();
 
@@ -11,13 +16,7 @@ app.use(
   "/api/*",
   cors({
     origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "http://localhost:4173",
-      "https://miniapp.anky.app",
-      "https://anky.app",
-      "https://www.anky.app",
-      "https://anky-v8.orbiter.website",
+      ...config.cors.origins,
       process.env.FRONTEND_URL || "",
     ].filter(Boolean),
     credentials: true,
@@ -33,11 +32,14 @@ app.route("/api", apiRoutes);
 // Fallback to index.html for SPA routing
 app.get("*", serveStatic({ path: "./public/index.html" }));
 
-const port = Number(process.env.PORT) || 3000;
+const port = config.runtime.port;
+
+// Print startup banner
+printStartupBanner();
 
 serve({
   fetch: app.fetch,
   port,
 });
 
-console.log(`Server running at http://localhost:${port}`);
+logger.info(`Server started successfully on port ${port}`);
