@@ -11,7 +11,36 @@ const config = getConfig();
 
 const app = new Hono();
 
-// CORS configuration
+// Top-level request logging (before any other middleware)
+app.use("*", async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  const url = c.req.url;
+  const origin = c.req.header("origin") || "no-origin";
+
+  logger.info(`[SERVER] Incoming: ${method} ${path}`);
+  logger.info(`[SERVER] Full URL: ${url}`);
+  logger.info(`[SERVER] Origin: ${origin}`);
+
+  // Log preflight requests specifically
+  if (method === "OPTIONS") {
+    logger.info(`[SERVER] PREFLIGHT REQUEST for ${path}`);
+    logger.info(`[SERVER] Access-Control-Request-Method: ${c.req.header("access-control-request-method")}`);
+    logger.info(`[SERVER] Access-Control-Request-Headers: ${c.req.header("access-control-request-headers")}`);
+  }
+
+  await next();
+
+  const status = c.res.status;
+  const contentType = c.res.headers.get("content-type") || "unknown";
+  const corsOrigin = c.res.headers.get("access-control-allow-origin") || "not-set";
+  const corsMethods = c.res.headers.get("access-control-allow-methods") || "not-set";
+
+  logger.info(`[SERVER] Response: ${method} ${path} → ${status} (${contentType})`);
+  logger.info(`[SERVER] CORS Headers: Allow-Origin=${corsOrigin}, Allow-Methods=${corsMethods}`);
+});
+
+// CORS configuration for API routes
 app.use(
   "/api/*",
   cors({
@@ -20,16 +49,20 @@ app.use(
       process.env.FRONTEND_URL || "",
     ].filter(Boolean),
     credentials: true,
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
   }),
 );
 
-// Serve static files from public directory
-app.use("/*", serveStatic({ root: "./public" }));
-
-// Mount API routes
+// Mount API routes FIRST (before static files)
 app.route("/api", apiRoutes);
 
-// Fallback to index.html for SPA routing
+logger.info("API routes mounted at /api");
+
+// Serve static files from public directory (only for non-API routes)
+app.use("/*", serveStatic({ root: "./public" }));
+
+// Fallback to index.html for SPA routing (only for non-API routes)
 app.get("*", serveStatic({ path: "./public/index.html" }));
 
 const port = config.runtime.port;

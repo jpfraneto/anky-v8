@@ -30,7 +30,7 @@ export const getConfig = () => ({
   },
 
   ipfs: {
-    pinata: !!(process.env.PINATA_JWT) ? "✓ Configured" : "✗ Missing",
+    pinata: !!process.env.PINATA_JWT ? "✓ Configured" : "✗ Missing",
   },
 
   cors: {

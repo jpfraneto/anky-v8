@@ -21,24 +21,78 @@ logger.info("Anky reference images initialized");
 
 const app = new Hono();
 
-// Request logging middleware
+// Log all registered routes at startup (will be called after all routes are defined)
+const logRegisteredRoutes = () => {
+  logger.info("========================================");
+  logger.info("API SERVER STARTING - REGISTERED ROUTES:");
+  logger.info("========================================");
+  // Routes defined in this file (mounted at /api in server.ts)
+  // So /me becomes /api/me, /ankys becomes /api/ankys, etc.
+  const routes = [
+    "GET  / → /api/",
+    "GET  /feed-html → /api/feed-html",
+    "POST /prompt → /api/prompt",
+    "POST /reflection → /api/reflection",
+    "GET  /images → /api/images",
+    "GET  /images/:imageId → /api/images/:imageId",
+    "POST /image → /api/image",
+    "POST /title → /api/title",
+    "POST /ipfs → /api/ipfs",
+    "POST /chat-short → /api/chat-short",
+    "POST /chat → /api/chat",
+    "GET  /db/status → /api/db/status",
+    "GET  /me → /api/me",
+    "POST /users → /api/users",
+    "GET  /users/:wallet → /api/users/:wallet",
+    "PATCH /users/:userId/settings → /api/users/:userId/settings",
+    "GET  /users/:userId/streak → /api/users/:userId/streak",
+    "GET  /users/:userId/ankys → /api/users/:userId/ankys",
+    "GET  /users/:userId/sessions → /api/users/:userId/sessions",
+    "GET  /users/:userId/conversations → /api/users/:userId/conversations",
+    "POST /sessions → /api/sessions",
+    "GET  /sessions/:sessionId → /api/sessions/:sessionId",
+    "GET  /s/:shareId → /api/s/:shareId",
+    "PATCH /sessions/:sessionId/privacy → /api/sessions/:sessionId/privacy",
+    "POST /ankys → /api/ankys",
+    "GET  /ankys → /api/ankys",
+    "PATCH /ankys/:ankyId → /api/ankys/:ankyId",
+    "GET  /sessions/:sessionId/anky → /api/sessions/:sessionId/anky",
+    "POST /ankys/:ankyId/mint → /api/ankys/:ankyId/mint",
+    "GET  /feed → /api/feed",
+    "POST /conversations → /api/conversations",
+    "POST /conversations/:conversationId/messages → /api/conversations/:conversationId/messages",
+    "GET  /conversations/:conversationId/messages → /api/conversations/:conversationId/messages",
+    "POST /conversations/:conversationId/close → /api/conversations/:conversationId/close",
+  ];
+  routes.forEach(r => logger.info(`  ${r}`));
+  logger.info("========================================");
+};
+
+// Request logging middleware - runs BEFORE route handlers
 app.use("*", async (c, next) => {
   const start = Date.now();
   const method = c.req.method;
   const path = c.req.path;
+  const url = c.req.url;
+
+  logger.info(`>>> INCOMING REQUEST: ${method} ${path}`);
+  logger.info(`    Full URL: ${url}`);
+  logger.info(`    Headers: ${JSON.stringify(Object.fromEntries(c.req.raw.headers))}`);
 
   await next();
 
   const duration = Date.now() - start;
   const status = c.res.status;
+  const contentType = c.res.headers.get("content-type") || "unknown";
+
+  logger.info(`<<< RESPONSE: ${method} ${path} ${status} ${duration}ms`);
+  logger.info(`    Content-Type: ${contentType}`);
 
   // Color code by status
   if (status >= 500) {
     logger.error(`${method} ${path} ${status} ${duration}ms`);
   } else if (status >= 400) {
     logger.warn(`${method} ${path} ${status} ${duration}ms`);
-  } else {
-    logger.info(`${method} ${path} ${status} ${duration}ms`);
   }
 });
 
@@ -145,7 +199,7 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
+      max_tokens: 2000,
       system: systemPrompt,
       messages: [{ role: "user", content: writingSession }],
     }),
@@ -154,6 +208,7 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
   const data = (await response.json()) as {
     content?: Array<{ text: string }>;
     error?: { message: string };
+    stop_reason?: string;
   };
 
   if (!response.ok) {
@@ -167,6 +222,10 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
   if (!firstContent) {
     logger.error("Unexpected Claude response for reflection", data);
     throw new Error("Invalid response from Claude API");
+  }
+
+  if (data.stop_reason === 'max_tokens') {
+    logger.warn("Reflection was truncated due to max_tokens limit");
   }
 
   logger.info("Reflection generated successfully");
@@ -562,7 +621,7 @@ app.get("/db/status", (c) => {
 // ----------------------------------------------------------------------------
 
 // Get everything about the logged-in user (profile, streak, stats, recent sessions)
-app.get("/api/me", authMiddleware, async (c) => {
+app.get("/me", authMiddleware, async (c) => {
   logger.debug("Fetching current user profile");
   if (!isDatabaseAvailable()) {
     return c.json({ error: "Database not available" }, 503);
@@ -622,7 +681,14 @@ app.get("/api/me", authMiddleware, async (c) => {
           id: s.anky.id,
           title: s.anky.title,
           imageUrl: s.anky.imageUrl,
+          imageBase64: s.anky.imageBase64,
           reflection: s.anky.reflection,
+          imagePrompt: s.anky.imagePrompt,
+          writingIpfsHash: s.anky.writingIpfsHash,
+          imageIpfsHash: s.anky.imageIpfsHash,
+          metadataIpfsHash: s.anky.metadataIpfsHash,
+          isMinted: s.anky.isMinted,
+          tokenId: s.anky.tokenId,
         }
       : null,
   }));
@@ -1161,5 +1227,8 @@ app.post("/conversations/:conversationId/close", authMiddleware, async (c) => {
 
   return c.json({ conversation });
 });
+
+// Log all routes when this module is loaded
+logRegisteredRoutes();
 
 export default app;
