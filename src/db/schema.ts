@@ -103,6 +103,7 @@ export const ankys = pgTable('ankys', {
   index('ankys_session_idx').on(table.writingSessionId),
   index('ankys_user_idx').on(table.userId),
   index('ankys_minted_idx').on(table.isMinted),
+  index('ankys_created_at_idx').on(table.createdAt),
 ]);
 
 // Conversations - chat sessions with Anky

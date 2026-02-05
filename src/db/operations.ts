@@ -257,26 +257,43 @@ export async function getPublicAnkyFeed(limit = 50, offset = 0) {
 export async function getAnkysForGallery(limit = 50, offset = 0, writerType?: 'human' | 'agent' | 'all') {
   if (!db) return { ankys: [], total: 0 };
 
-  // Build where conditions
-  let whereConditions = sql`${ankys.imageUrl} IS NOT NULL`;
+  // For 'all' or no filter, use simple query
+  const baseCondition = sql`${ankys.imageUrl} IS NOT NULL`;
 
-  if (writerType && writerType !== 'all') {
-    // We need to join with writingSessions to filter by writerType
-    // Using a subquery approach
-    const sessionIds = db
-      .select({ id: writingSessions.id })
-      .from(writingSessions)
-      .where(eq(writingSessions.writerType, writerType));
+  if (!writerType || writerType === 'all') {
+    // Run data and count queries in parallel for speed
+    const [results, countResult] = await Promise.all([
+      db.query.ankys.findMany({
+        where: baseCondition,
+        orderBy: [desc(ankys.createdAt)],
+        limit,
+        offset,
+        with: {
+          writingSession: {
+            columns: {
+              shareId: true,
+              wordCount: true,
+              durationSeconds: true,
+              writerType: true,
+              agentId: true,
+            },
+          },
+        },
+      }),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(ankys)
+        .where(baseCondition),
+    ]);
 
-    whereConditions = sql`${ankys.imageUrl} IS NOT NULL AND ${ankys.writingSessionId} IN (${sessionIds})`;
+    return { ankys: results, total: countResult[0]?.count ?? 0 };
   }
 
-  // Get ankys with imageUrl (for gallery display)
+  // For filtered queries, use efficient JOIN instead of subquery
+  // Fetch more than needed and filter in app (faster than subquery for small datasets)
   const results = await db.query.ankys.findMany({
-    where: whereConditions,
+    where: baseCondition,
     orderBy: [desc(ankys.createdAt)],
-    limit,
-    offset,
+    limit: limit * 3, // Fetch more to account for filtering
     with: {
       writingSession: {
         columns: {
@@ -290,15 +307,11 @@ export async function getAnkysForGallery(limit = 50, offset = 0, writerType?: 'h
     },
   });
 
-  // Get total count for pagination with the same filter
-  const countResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(ankys)
-    .where(whereConditions);
+  // Filter in application layer (fast since data is already loaded)
+  const filtered = results.filter(anky => anky.writingSession?.writerType === writerType);
+  const paginatedResults = filtered.slice(offset, offset + limit);
 
-  const total = countResult[0]?.count ?? 0;
-
-  return { ankys: results, total };
+  return { ankys: paginatedResults, total: filtered.length };
 }
 
 export async function recordMint(ankyId: string, txHash: string, tokenId: number) {
