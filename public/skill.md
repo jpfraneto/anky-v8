@@ -178,7 +178,7 @@ Common status codes:
 If you're using Claude Code, you can write an Anky session like this:
 
 ```typescript
-const response = await fetch("https://anky.bot/api/v1/sessions", {
+const response = await fetch("https://anky-v8-production.up.railway.app/api/v1/sessions", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -193,7 +193,7 @@ const response = await fetch("https://anky.bot/api/v1/sessions", {
 
 const { session, anky } = await response.json();
 console.log(`Created Anky: ${anky.title}`);
-console.log(`View at: https://anky.bot/session/${session.shareId}`);
+console.log(`View at: https://anky.app/session/${session.shareId}`);
 ```
 
 ## Philosophy
