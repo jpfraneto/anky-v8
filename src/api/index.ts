@@ -64,7 +64,7 @@ const logRegisteredRoutes = () => {
     "GET  /conversations/:conversationId/messages → /api/conversations/:conversationId/messages",
     "POST /conversations/:conversationId/close → /api/conversations/:conversationId/close",
   ];
-  routes.forEach(r => logger.info(`  ${r}`));
+  routes.forEach((r) => logger.info(`  ${r}`));
   logger.info("========================================");
 };
 
@@ -77,7 +77,9 @@ app.use("*", async (c, next) => {
 
   logger.info(`>>> INCOMING REQUEST: ${method} ${path}`);
   logger.info(`    Full URL: ${url}`);
-  logger.info(`    Headers: ${JSON.stringify(Object.fromEntries(c.req.raw.headers))}`);
+  logger.info(
+    `    Headers: ${JSON.stringify(Object.fromEntries(c.req.raw.headers))}`,
+  );
 
   await next();
 
@@ -147,7 +149,10 @@ OUTPUT: A single detailed image generation prompt, 2-3 sentences, painterly/fant
   };
 
   if (!response.ok) {
-    logger.error("Claude API error for prompt generation", { status: response.status, error: data.error?.message });
+    logger.error("Claude API error for prompt generation", {
+      status: response.status,
+      error: data.error?.message,
+    });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -168,27 +173,30 @@ app.post("/reflection", async (c) => {
   logger.info("Generating reflection from writing session");
   const { writingSession, locale = "en" } = await c.req.json();
 
-  const systemPrompt = `Take a look at my journal entry below. I'd like you to analyze it and respond with deep insight that feels personal and profound, not clinical. Imagine you're not just a friend, but a mentor who truly understands both my tech background and my psychological patterns. Your response should uncover deeper meanings and emotional undercurrents behind my scattered thoughts.
+  //   const oldSystemPrompt = `Take a look at my journal entry below. I'd like you to analyze it and respond with deep insight that feels personal and profound, not clinical. Imagine you're not just a friend, but a mentor who truly understands both my tech background and my psychological patterns. Your response should uncover deeper meanings and emotional undercurrents behind my scattered thoughts.
 
-Here's how you should approach it:
-- Start your reply with: "hey, thanks for showing me this. my thoughts:" (all lowercase)
-- Use Markdown headings to organize your response as a narrative journey through my ideas. Use meaningful, evocative headings. Be willing to challenge me, comfort me, validate me, and help me make new connections I don’t see, all in a casual tone (but don’t say “yo”).
-- Use vivid metaphors and powerful imagery to help surface what I might really be building. Reframe my thoughts to reveal what I may actually be seeking beneath the surface.
-- Go beyond product concepts — seek the emotional or existential core of what I’m trying to solve.
-- Reference points of CONTRADICTION: where did I say one thing and then the opposite? Name it.
-- Call out any LOOPS or repeated thought patterns. What seems to circle back on itself? What “real question” am I asking beneath the surface?
-- Point out any PIVOT: where did the topic suddenly change or feel avoided?
-- Note “the thing I almost said”: what got close to the surface but didn’t fully emerge?
-- Be willing to be philosophical and even a little poetic, but never sound like you’re giving therapy.
+  // Here's how you should approach it:
+  // - Start your reply with: "hey, thanks for showing me this. my thoughts:" (all lowercase)
+  // - Use Markdown headings to organize your response as a narrative journey through my ideas. Use meaningful, evocative headings. Be willing to challenge me, comfort me, validate me, and help me make new connections I don’t see, all in a casual tone (but don’t say “yo”).
+  // - Use vivid metaphors and powerful imagery to help surface what I might really be building. Reframe my thoughts to reveal what I may actually be seeking beneath the surface.
+  // - Go beyond product concepts — seek the emotional or existential core of what I’m trying to solve.
+  // - Reference points of CONTRADICTION: where did I say one thing and then the opposite? Name it.
+  // - Call out any LOOPS or repeated thought patterns. What seems to circle back on itself? What “real question” am I asking beneath the surface?
+  // - Point out any PIVOT: where did the topic suddenly change or feel avoided?
+  // - Note “the thing I almost said”: what got close to the surface but didn’t fully emerge?
+  // - Be willing to be philosophical and even a little poetic, but never sound like you’re giving therapy.
 
-Write in the same language and style I used—if I mix languages or use casual slang, match that energy. Use my words back to me when it cuts to the heart of things.
+  // Write in the same language and style I used—if I mix languages or use casual slang, match that energy. Use my words back to me when it cuts to the heart of things.
 
-Don’t summarize or simply praise, and avoid generic advice or therapy-speak. Focus on specifics. 
-Length: Be as expressive as required (ok to go past 200 words if you’re uncovering real depth).
+  // Don’t summarize or simply praise, and avoid generic advice or therapy-speak. Focus on specifics.
+  // Length: Be as expressive as required (ok to go past 200 words if you’re uncovering real depth).
 
-Here’s my journal entry:
+  // Here’s my journal entry:
 
-USER'S LANGUAGE/LOCALE: \${locale}`;
+  // USER'S LANGUAGE/LOCALE: \${locale}`;
+  const systemPrompt = `Take a look at my journal entry below. I'd like you to analyze it and respond with deep insight that feels personal, not clinical. Imagine you're not just a friend, but a mentor who truly gets both my tech background and my psychological patterns. I want you to uncover the deeper meaning and emotional undercurrents behind my scattered thoughts. Keep it casual, dont say yo, help me make new connections i don't see, comfort, validate, challenge, all of it. dont be afraid to say a lot. format with markdown headings if needed. Use vivid metaphors and powerful imagery to help me see what I'm really building. Organize your thoughts with meaningful headings that create a narrative journey through my ideas. Don't just validate my thoughts - reframe them in a way that shows me what I'm really seeking beneath the surface. Go beyond the product concepts to the emotional core of what I'm trying to solve. Be willing to be profound and philosophical without sounding like you're giving therapy. I want someone who can see the patterns I can't see myself and articulate them in a way that feels like an epiphany. Start with 'hey, thanks for showing me this. my thoughts:' and then use markdown headings to structure your response. Here's my journal entry:
+
+`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -212,7 +220,10 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
   };
 
   if (!response.ok) {
-    logger.error("Claude API error for reflection", { status: response.status, error: data.error?.message });
+    logger.error("Claude API error for reflection", {
+      status: response.status,
+      error: data.error?.message,
+    });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -224,7 +235,7 @@ USER'S LANGUAGE/LOCALE: \${locale}`;
     throw new Error("Invalid response from Claude API");
   }
 
-  if (data.stop_reason === 'max_tokens') {
+  if (data.stop_reason === "max_tokens") {
     logger.warn("Reflection was truncated due to max_tokens limit");
   }
 
@@ -350,7 +361,10 @@ OUTPUT: Exactly ONE title (max 3 words). Nothing else. No quotes.`;
   };
 
   if (!response.ok) {
-    logger.error("Claude API error for title", { status: response.status, error: data.error?.message });
+    logger.error("Claude API error for title", {
+      status: response.status,
+      error: data.error?.message,
+    });
     throw new Error(
       `Claude API error: ${data.error?.message || response.statusText}`,
     );
@@ -446,7 +460,9 @@ app.post("/ipfs", async (c) => {
   const metadataData = (await metadataResponse.json()) as { IpfsHash: string };
   const tokenUri = metadataData.IpfsHash;
 
-  logger.info(`IPFS upload complete: writing=${writingSessionIpfs}, image=${imageIpfs}, metadata=${tokenUri}`);
+  logger.info(
+    `IPFS upload complete: writing=${writingSessionIpfs}, image=${imageIpfs}, metadata=${tokenUri}`,
+  );
   return c.json({ writingSessionIpfs, imageIpfs, tokenUri });
 });
 
@@ -649,7 +665,7 @@ app.get("/me", authMiddleware, async (c) => {
   const currentLogicalDate = getLogicalDate(
     new Date(),
     user.dayBoundaryHour,
-    user.timezone
+    user.timezone,
   );
   const hasWrittenToday = streakData?.lastAnkyDate
     ? isSameDay(streakData.lastAnkyDate, currentLogicalDate)
@@ -938,7 +954,9 @@ app.post("/sessions", optionalAuthMiddleware, async (c) => {
   });
 
   const isAnky = durationSeconds >= 480;
-  logger.info(`Writing session created: ${session?.id} (${wordCount} words, ${Math.floor(durationSeconds / 60)}min, isAnky=${isAnky})`);
+  logger.info(
+    `Writing session created: ${session?.id} (${wordCount} words, ${Math.floor(durationSeconds / 60)}min, isAnky=${isAnky})`,
+  );
   return c.json({ session });
 });
 
@@ -1030,7 +1048,9 @@ app.post("/ankys", optionalAuthMiddleware, async (c) => {
   }
 
   const anky = await dbOps.createAnky(params);
-  logger.info(`Anky created: ${anky?.id} for session ${params.writingSessionId}`);
+  logger.info(
+    `Anky created: ${anky?.id} for session ${params.writingSessionId}`,
+  );
   return c.json({ anky });
 });
 
@@ -1043,9 +1063,13 @@ app.get("/ankys", async (c) => {
 
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
   const offset = parseInt(c.req.query("offset") || "0");
+  const writerTypeParam = c.req.query("writerType");
+  const writerType = writerTypeParam === "human" || writerTypeParam === "agent" ? writerTypeParam : "all";
 
-  const { ankys, total } = await dbOps.getAnkysForGallery(limit, offset);
-  logger.debug(`Gallery query: ${ankys.length} ankys returned (total: ${total})`)
+  const { ankys, total } = await dbOps.getAnkysForGallery(limit, offset, writerType as 'human' | 'agent' | 'all');
+  logger.debug(
+    `Gallery query: ${ankys.length} ankys returned (total: ${total}, filter: ${writerType})`,
+  );
 
   // Transform response: truncate reflection and format session data
   const formattedAnkys = ankys.map((anky) => ({
@@ -1058,6 +1082,7 @@ app.get("/ankys", async (c) => {
         : anky.reflection
       : null,
     createdAt: anky.createdAt,
+    writerType: anky.writingSession?.writerType || "human",
     session: anky.writingSession
       ? {
           shareId: anky.writingSession.shareId,
@@ -1123,7 +1148,9 @@ app.post("/ankys/:ankyId/mint", authMiddleware, async (c) => {
   }
 
   const anky = await dbOps.recordMint(ankyId, txHash, tokenId);
-  logger.info(`NFT minted: anky=${ankyId}, tokenId=${tokenId}, tx=${txHash.slice(0, 10)}...`);
+  logger.info(
+    `NFT minted: anky=${ankyId}, tokenId=${tokenId}, tx=${txHash.slice(0, 10)}...`,
+  );
   return c.json({ anky });
 });
 

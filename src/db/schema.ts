@@ -15,6 +15,23 @@ export const users = pgTable('users', {
   index('users_fid_idx').on(table.fid),
 ]);
 
+// Agents - AI agents that can write through Anky
+export const agents = pgTable('agents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description'),
+  model: text('model'),
+  apiKeyHash: text('api_key_hash').notNull(),
+  ownerId: uuid('owner_id').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  lastActiveAt: timestamp('last_active_at'),
+  sessionCount: integer('session_count').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+}, (table) => [
+  index('agents_name_idx').on(table.name),
+  index('agents_api_key_hash_idx').on(table.apiKeyHash),
+]);
+
 // Writing Sessions - every time someone writes
 export const writingSessions = pgTable('writing_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -38,12 +55,18 @@ export const writingSessions = pgTable('writing_sessions', {
   shareId: text('share_id').unique(),
   isPublic: boolean('is_public').notNull().default(true), // For privacy toggle
 
+  // Writer type: human or agent
+  writerType: text('writer_type').notNull().default('human'),
+  agentId: uuid('agent_id').references(() => agents.id),
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   index('sessions_user_idx').on(table.userId),
   index('sessions_logical_date_idx').on(table.logicalDate),
   index('sessions_share_idx').on(table.shareId),
   index('sessions_is_anky_idx').on(table.isAnky),
+  index('sessions_writer_type_idx').on(table.writerType),
+  index('sessions_agent_idx').on(table.agentId),
 ]);
 
 // Ankys - generated from 8+ minute sessions
@@ -167,12 +190,25 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   ankys: many(ankys),
   conversations: many(conversations),
   streak: one(userStreaks),
+  ownedAgents: many(agents),
+}));
+
+export const agentsRelations = relations(agents, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [agents.ownerId],
+    references: [users.id],
+  }),
+  writingSessions: many(writingSessions),
 }));
 
 export const writingSessionsRelations = relations(writingSessions, ({ one, many }) => ({
   user: one(users, {
     fields: [writingSessions.userId],
     references: [users.id],
+  }),
+  agent: one(agents, {
+    fields: [writingSessions.agentId],
+    references: [agents.id],
   }),
   anky: one(ankys),
   conversations: many(conversations),

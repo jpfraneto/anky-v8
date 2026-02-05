@@ -1,5 +1,5 @@
 import { eq, desc, and, sql } from 'drizzle-orm';
-import { db, users, writingSessions, ankys, conversations, conversationMessages, userStreaks, generatedImages } from './index';
+import { db, users, writingSessions, ankys, conversations, conversationMessages, userStreaks, generatedImages, agents } from './index';
 import { getLogicalDate, areConsecutiveDays, isSameDay, daysSince, generateShareId } from './streak-utils';
 
 // ============================================================================
@@ -254,12 +254,26 @@ export async function getPublicAnkyFeed(limit = 50, offset = 0) {
   });
 }
 
-export async function getAnkysForGallery(limit = 50, offset = 0) {
+export async function getAnkysForGallery(limit = 50, offset = 0, writerType?: 'human' | 'agent' | 'all') {
   if (!db) return { ankys: [], total: 0 };
+
+  // Build where conditions
+  let whereConditions = sql`${ankys.imageUrl} IS NOT NULL`;
+
+  if (writerType && writerType !== 'all') {
+    // We need to join with writingSessions to filter by writerType
+    // Using a subquery approach
+    const sessionIds = db
+      .select({ id: writingSessions.id })
+      .from(writingSessions)
+      .where(eq(writingSessions.writerType, writerType));
+
+    whereConditions = sql`${ankys.imageUrl} IS NOT NULL AND ${ankys.writingSessionId} IN (${sessionIds})`;
+  }
 
   // Get ankys with imageUrl (for gallery display)
   const results = await db.query.ankys.findMany({
-    where: sql`${ankys.imageUrl} IS NOT NULL`,
+    where: whereConditions,
     orderBy: [desc(ankys.createdAt)],
     limit,
     offset,
@@ -269,16 +283,18 @@ export async function getAnkysForGallery(limit = 50, offset = 0) {
           shareId: true,
           wordCount: true,
           durationSeconds: true,
+          writerType: true,
+          agentId: true,
         },
       },
     },
   });
 
-  // Get total count for pagination
+  // Get total count for pagination with the same filter
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(ankys)
-    .where(sql`${ankys.imageUrl} IS NOT NULL`);
+    .where(whereConditions);
 
   const total = countResult[0]?.count ?? 0;
 
@@ -569,6 +585,127 @@ export async function linkImageToAnky(imageId: string, ankyId: string) {
     .returning();
 
   return updated;
+}
+
+// ============================================================================
+// AGENT OPERATIONS
+// ============================================================================
+
+export async function createAgent(params: {
+  name: string;
+  description?: string;
+  model?: string;
+  apiKeyHash: string;
+  ownerId?: string;
+}) {
+  if (!db) return null;
+
+  const [agent] = await db.insert(agents).values(params).returning();
+  return agent;
+}
+
+export async function getAgentByApiKeyHash(hash: string) {
+  if (!db) return null;
+
+  return db.query.agents.findFirst({
+    where: eq(agents.apiKeyHash, hash),
+  });
+}
+
+export async function getAgentById(agentId: string) {
+  if (!db) return null;
+
+  return db.query.agents.findFirst({
+    where: eq(agents.id, agentId),
+  });
+}
+
+export async function getAgentByName(name: string) {
+  if (!db) return null;
+
+  return db.query.agents.findFirst({
+    where: eq(agents.name, name),
+  });
+}
+
+export async function getAgentSessions(agentId: string, limit = 50) {
+  if (!db) return [];
+
+  return db.query.writingSessions.findMany({
+    where: eq(writingSessions.agentId, agentId),
+    orderBy: [desc(writingSessions.createdAt)],
+    limit,
+    with: {
+      anky: true,
+    },
+  });
+}
+
+export async function incrementAgentSessionCount(agentId: string) {
+  if (!db) return null;
+
+  const [updated] = await db.update(agents)
+    .set({
+      sessionCount: sql`${agents.sessionCount} + 1`,
+      lastActiveAt: new Date(),
+    })
+    .where(eq(agents.id, agentId))
+    .returning();
+
+  return updated;
+}
+
+export async function updateAgent(agentId: string, updates: {
+  name?: string;
+  description?: string;
+  model?: string;
+  isActive?: boolean;
+}) {
+  if (!db) return null;
+
+  const [updated] = await db.update(agents)
+    .set(updates)
+    .where(eq(agents.id, agentId))
+    .returning();
+
+  return updated;
+}
+
+// ============================================================================
+// MODIFIED: CREATE WRITING SESSION WITH AGENT SUPPORT
+// ============================================================================
+
+export async function createWritingSessionForAgent(params: {
+  agentId: string;
+  content: string;
+  durationSeconds: number;
+  wordCount: number;
+  wordsPerMinute?: number;
+  isPublic?: boolean;
+}) {
+  if (!db) return null;
+
+  const isAnky = params.durationSeconds >= 480; // 8 minutes
+  const logicalDate = getLogicalDate(new Date(), 4, 'UTC');
+  const shareId = generateShareId();
+
+  const [session] = await db.insert(writingSessions).values({
+    content: params.content,
+    durationSeconds: params.durationSeconds,
+    wordCount: params.wordCount,
+    wordsPerMinute: params.wordsPerMinute,
+    isAnky,
+    logicalDate,
+    shareId,
+    isPublic: params.isPublic ?? true,
+    writerType: 'agent',
+    agentId: params.agentId,
+  }).returning();
+
+  // Increment agent session count
+  await incrementAgentSessionCount(params.agentId);
+
+  return session;
 }
 
 // ============================================================================
